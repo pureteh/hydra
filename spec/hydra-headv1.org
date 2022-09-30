@@ -1,0 +1,85 @@
+#+title: HydraV1 protocol specification
+
+This document does specify the layer 2 protocol of =HydraV1=. More specifically, it outlines the states and admissible transitions of actors following the protocol.
+
+* Preliminaries
+
+The specification only focuses on the layer 2 interactions between Hydra nodes, as well as the transactions submitted and observed on the layer 1 blockchain. For a more practical piece of documentation on how the =hydra-node= behaves, see [[here][./docs/core-concepts/behavior.md]].
+
+The specification covers only a single instance of a Hydra Head. However, some implementations may choose to track one or more instances. As multiple Hydra Heads might exist on the same layer 1 blockchain, it is vital that they do not interfere and the specification will take special care to ensure this.
+
+They Hydra Head protocol is specified as a reactive system that processes two kinds of events: =ChainEvent= and =NetworkEvent=. All events are processed to completion and there is no pre-emption ([[https://en.wikipedia.org/wiki/Run_to_completion_scheduling][run-to-completion]] semantics).
+
+* Notation
+
+The formalism uses [[https://en.wikipedia.org/wiki/UML_state_machine][UML statechart]] language where transitions are labeled: =input [condition] / output=. When two outputs (e.g. =A= and =B=) are expected we write =A,B=, while ={A,B}= denotes mutual exclusiveness of outputs.
+
+
+* Diagram
+
+#+BEGIN_SRC plantuml
+@startuml
+hide empty description
+
+Initializing : HeadId = H(outref -> μ_Head) = pid
+Initializing : Commits = {}
+
+[*] --> Initializing : InitTx(outref, vks, K, T)
+Initializing -> Initializing : CommitTx(vk, η) / Commits[vk] = η
+note on link
+  ν_initial (commit)
+  ...
+  pid → H(vk) → 1 ∈ val'
+  ...
+end note
+
+Initializing --> Final : AbortTx
+note on link
+  ν_initial (abort) OR ν_commit (abort)
+  ...
+end note
+
+Initializing --> Open : CollectTx
+note on link
+  ν_commit (collect) AND ν_head (collect)
+  ...
+end note
+
+state Open {
+  state "s_s = s_c" as noseen
+  state "s_s = s_c + 1" as seen
+  state ackc <<choice>>
+  [*] -> noseen
+  noseen --> seen : ReqSn(s)
+  seen -> ackc : AckSn(s)
+  ackc -> noseen : [complete]
+  ackc -> seen : [incomplete]
+}
+Open : s_s = s_c = 0
+Open : L_s = L_c = U_0 = ⋃(i ∈ 0..n) Commits_i
+Open : Txs = []
+
+
+Open --> Closed : CloseTx / OnCloseTx
+note on link
+  ν_head (close)
+  ...
+end note
+
+Closed -> Closed : ContestTx / OnContestTx
+note on link
+  ν_head (contest)
+  ...
+end note
+
+Closed --> FanoutPossible : [time passes after deadline]
+FanoutPossible -left-> Final : FanoutTx / OnFanoutTx
+note on link
+  ν_head (fanout)
+  ...
+end note
+@enduml
+#+END_SRC
+
+#+RESULTS:
+[[file:/tmp/babel-ngxdB5/plantuml-YjFI8V.png]]
