@@ -84,6 +84,7 @@ library
     Hydra.Data.ContestationPeriod
     Hydra.Data.Party
     Hydra.Data.Utxo
+    Hydra.Modelv1.Initial
     Plutus.Extras
     Plutus.Orphans
 
@@ -137,7 +138,7 @@ test-suite tests
     , QuickCheck
     , time
 
-  build-tool-depends: hspec-discover:hspec-discover -any
+  build-tool-depends: hspec-discover:hspec-discover
 
 executable inspect-script
   import:         project-config
