@@ -52,18 +52,31 @@ state Open {
   [*] -> noseen
   noseen --> seen : ReqSn(s)
   seen -> ackc : AckSn(s)
-  ackc -> noseen : [complete]
+  ackc -> noseen : [complete] /
   ackc -> seen : [incomplete]
 }
+Open : From Tx: η_0
 Open : s_s = s_c = 0
 Open : L_s = L_c = U_0 = ⋃(i ∈ 0..n) Commits_i
 Open : Txs = []
 
+Closed : From Tx: s', η_0', η', DL', C'
 
 Open --> Closed : CloseTx / OnCloseTx
 note on link
-  ν_head (close)
+  ν_head (close, K, n, L, η_0, η, ξ)
   ...
+  C' == {pkh}
+  s' >= 0
+  s' == 0 || Verify(K, (pid, s', η_0, η'), ξ)
+
+  η_0' == η_0
+
+  T_max <= T_min + L
+  DL' == T_max + L
+
+  val' == val
+  Mint == 0
 end note
 
 Closed -> Closed : ContestTx / OnContestTx
@@ -82,4 +95,4 @@ end note
 #+END_SRC
 
 #+RESULTS:
-[[file:/tmp/babel-ngxdB5/plantuml-YjFI8V.png]]
+[[file:/tmp/babel-QsWbli/plantuml-yyo6E6.png]]
