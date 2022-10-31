@@ -4,7 +4,7 @@ This document does specify the layer 2 protocol of =HydraV1=. More specifically,
 
 * Preliminaries
 
-The specification only focuses on the layer 2 interactions between Hydra nodes, as well as the transactions submitted and observed on the layer 1 blockchain. For a more practical piece of documentation on how the =hydra-node= behaves, see [[here][./docs/core-concepts/behavior.md]].
+The specification only focuses on the layer 2 interactions between Hydra nodes, as well as the transactions submitted and observed on the layer 1 blockchain. For a more practical piece of documentation on how the =hydra-node= behaves, see [[https://hydra.family/head-protocol/core-concepts/behavior/][here]].
 
 The specification covers only a single instance of a Hydra Head. However, some implementations may choose to track one or more instances. As multiple Hydra Heads might exist on the same layer 1 blockchain, it is vital that they do not interfere and the specification will take special care to ensure this.
 
@@ -49,15 +49,35 @@ state Open {
   state "s_s = s_c" as noseen
   state "s_s = s_c + 1" as seen
   state ackc <<choice>>
-  [*] -> noseen
-  noseen --> seen : ReqSn(s)
-  seen -> ackc : AckSn(s)
-  ackc -> noseen : [complete] /
-  ackc -> seen : [incomplete]
+  state reqc <<choice>>
+  [*] --> noseen
+
+  noseen : s_c = s
+  noseen : ξ = Aggregate(sigs)
+  'TODO: transition out right away or choice?
+  noseen -> fail : [!Verify(K_agg, (s, U_s), ξ)]
+  noseen --> reqc : ReqSn(vk, s, HTxs)
+  reqc --> seen : [isLeader(vk, s), s == s_s + 1]
+  reqc -up-> fail : [otherwise]
+
+  seen : s_s = s
+  seen : sigs = {}
+  seen : Txs = waitTxs(HTxs)
+  seen : U_s = applyOrFail(U_c, Txs)
+  'TODO: side-effect in state entry
+  seen : σ = Sign((s, U_s), sk)
+  seen : broadcast(ackSn, s, σ)
+
+  seen -> ackc : AckSn(vk, s, σ) [ s == s_s] / sigs[vk] = σ
+  ackc -> noseen : [|sigs| == |VKs|]
+  ackc -> seen : [|sigs| ≠ |VKs|]
+
+  'TODO: issue snapshot?
+  'TODO: wait or fail on s == s_s + 1
 }
 Open : From Tx: η_0
 Open : s_s = s_c = 0
-Open : L_s = L_c = U_0 = ⋃(i ∈ 0..n) Commits_i
+Open : U_s = U_c = U_0 = ⋃(i ∈ 0..n) Commits_i
 Open : Txs = []
 
 Closed : From Tx: s', η_0', η', DL', C'
@@ -95,4 +115,4 @@ end note
 #+END_SRC
 
 #+RESULTS:
-[[file:/tmp/babel-QsWbli/plantuml-yyo6E6.png]]
+[[file:/tmp/babel-QsWbli/plantuml-2ucahO.png]]
