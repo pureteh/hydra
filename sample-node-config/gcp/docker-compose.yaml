@@ -40,18 +40,31 @@ services:
       - "4001:4001"
       - "5001:5001"
     command:
-      [ "--node-id", "1"
-      , "--api-host", "0.0.0.0"
-      , "--host", "0.0.0.0"
-      , "--monitoring-port", "6001"
-      , "--hydra-scripts-tx-id", "${HYDRA_SCRIPTS_TX_ID}"
-      , "--hydra-signing-key", "/data/keys/arnaud-hydra.sk"
-      , "--cardano-signing-key", "/data/keys/arnaud.sk"
-      , "--ledger-genesis", "/data/genesis-shelley.json"
-      , "--ledger-protocol-parameters", "/data/protocol-parameters.json"
-      , "--network-id", "${NETWORK_MAGIC}"
-      , "--node-socket", "/devnet/node.socket"
-      , "--persistence-dir", "/hydra-data"
+        [ "--node-id", "arnaud"
+        , "--api-host" , "0.0.0.0"
+        , "--host", "0.0.0.0"
+        , "--port", "5003"
+        , "--monitoring-port", "6001"
+        , "--persistence-dir", "/hydra-data"
+        , "--hydra-signing-key", "/data/keys/arnaud-hydra.sk"
+        , "--cardano-signing-key", "/data/keys/arnaud.sk"
+        , "--ledger-genesis", "/data/genesis-shelley.json"
+        , "--ledger-protocol-parameters", "/data/protocol-parameters.json"
+        , "--network-id", "${NETWORK_MAGIC}"
+        , "--hydra-scripts-tx-id", "${HYDRA_SCRIPTS_TX_ID}"
+        , "--node-socket", "/devnet/node.socket"
+        , "--peer", "fk.ncoding.at:5001" # sebastian
+        , "--cardano-verification-key", "/data/keys/sebastian.cardano.vk"
+        , "--hydra-verification-key", "/data/keys/sebastian.hydra.vk"
+        # "--peer","13.39.80.222:5001" # pascal
+        # "--cardano-verification-key","/data/keys/pascal.cardano.vk"
+        # "--hydra-verification-key","/data/keys/pascal.hydra.vk"
+        , "--peer","13.38.49.252:5001" # sasha
+        , "--cardano-verification-key","/data/keys/sasha.cardano.vk"
+        , "--hydra-verification-key","/data/keys/sasha.hydra.vk"
+        , "--peer","13.38.189.209:5001" # franco
+        , "--cardano-verification-key","/data/keys/franco.cardano.vk"
+        , "--hydra-verification-key","/data/keys/franco.hydra.vk"
       ]
 
   hydra-tui:
