@@ -1,5 +1,7 @@
 const protocol = window.location.protocol == "https:" ? "wss:" : "ws:";
-const client = new WebSocket(protocol + "//" + "13.38.189.209");
+// FIXME: un-hardcode
+const client = new WebSocket("wss://hydraw.fk.ncoding.at");
+
 import { paintPixel } from "./paint.js";
 
 const metadataLabel = 14;
@@ -11,14 +13,21 @@ const query = (window.location.search || "?")
 const delay = Number((query.filter(([k, v]) => k == 'delay')[0] || [])[1] || 0);
 
 let n = 0;
-let knownUtxo = {};
 
+let getUTxOCallbacks = [];
+const getUTxO = () => {
+  client.send(JSON.stringify({ tag: "GetUTxO" }));
+  return new Promise((resolve, reject) => {
+    getUTxOCallbacks.push(resolve);
+  });
+}
 client.addEventListener("message", e => {
   const msg = JSON.parse(e.data);
   switch (msg.tag) {
     case "GetUTxOResponse":
-      knownUtxo = msg.utxo;
-      console.log("New utxo", knownUtxo);
+      // FIXME: should wait for corresponding response (echoed identifier)
+      getUTxOCallbacks.map((resolve) => resolve(msg.utxo));
+      getUTxOCallbacks = [];
       break;
     case "TxSeen":
       console.log("New transaction seen", msg.transaction.id);
@@ -54,7 +63,7 @@ const drawPixel = (x, y, rgb) => {
 }
 
 
-canvas.addEventListener('click', function (e) {
+canvas.addEventListener('click', function(e) {
   console.log("event", e);
   const canvasPosition = {
     x: canvas.offsetLeft,
@@ -70,7 +79,7 @@ canvas.addEventListener('click', function (e) {
   const x = Math.floor(clickedPixel.x);
   const y = Math.floor(clickedPixel.y);
 
-  paintPixel(client, x, y, currentColor)
+  paintPixel(getUTxO, x, y, currentColor)
     .then(() => console.log("Ok"))
     .catch(e => console.log("Error", e));
 });
@@ -83,7 +92,7 @@ const picker = new Picker(currentColorElement);
 
 currentColorElement.style.background = `rgb(${currentColor[0]}, ${currentColor[1]}, ${currentColor[2]})`;
 
-picker.onDone = function (color) {
+picker.onDone = function(color) {
   console.log("Color picked:", color);
   currentColor = color.rgba;
   currentColorElement.style.background = color.rgbaString;
