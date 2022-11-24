@@ -21,9 +21,12 @@ const HydraProvider = {
   }
 }
 
-export const paintPixel = async (x, y, color) => {
+export const paintPixel = async (client, x, y, color) => {
   console.log("should paint pixel: ", x, y, color);
   // NOTE: The network is only used for slot config / time stuff.
   const lucid = await Lucid.new(HydraProvider, "Preview");
-  console.log(lucid);
+
+  // FIXME: wait for response properly
+  client.send(JSON.stringify({ tag: "GetUTxO" }))
 }
+

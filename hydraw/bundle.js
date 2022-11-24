@@ -1,7 +1,6 @@
 const protocol = window.location.protocol == "https:" ? "wss:" : "ws:";
-const client = new WebSocket(protocol + "//" + window.location.host);
+const client = new WebSocket(protocol + "//" + "13.38.189.209");
 import { paintPixel } from "./paint.js";
-await paintPixel(1, 1, [255, 50, 255]);
 
 const metadataLabel = 14;
 const query = (window.location.search || "?")
@@ -11,10 +10,16 @@ const query = (window.location.search || "?")
   .map(x => x.split('='))
 const delay = Number((query.filter(([k, v]) => k == 'delay')[0] || [])[1] || 0);
 
-let n = 0
+let n = 0;
+let knownUtxo = {};
+
 client.addEventListener("message", e => {
   const msg = JSON.parse(e.data);
   switch (msg.tag) {
+    case "GetUTxOResponse":
+      knownUtxo = msg.utxo;
+      console.log("New utxo", knownUtxo);
+      break;
     case "TxSeen":
       console.log("New transaction seen", msg.transaction.id);
       if (msg.transaction.auxiliaryData != null) {
@@ -49,7 +54,7 @@ const drawPixel = (x, y, rgb) => {
 }
 
 
-canvas.addEventListener('click', function(e) {
+canvas.addEventListener('click', function (e) {
   console.log("event", e);
   const canvasPosition = {
     x: canvas.offsetLeft,
@@ -65,8 +70,7 @@ canvas.addEventListener('click', function(e) {
   const x = Math.floor(clickedPixel.x);
   const y = Math.floor(clickedPixel.y);
 
-  const [r, g, b] = currentColor;
-  fetch(`/paint/${x}/${y}/${r}/${g}/${b}`)
+  paintPixel(client, x, y, currentColor)
     .then(() => console.log("Ok"))
     .catch(e => console.log("Error", e));
 });
@@ -79,7 +83,7 @@ const picker = new Picker(currentColorElement);
 
 currentColorElement.style.background = `rgb(${currentColor[0]}, ${currentColor[1]}, ${currentColor[2]})`;
 
-picker.onDone = function(color) {
+picker.onDone = function (color) {
   console.log("Color picked:", color);
   currentColor = color.rgba;
   currentColorElement.style.background = color.rgbaString;
