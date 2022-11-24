@@ -1,5 +1,7 @@
 const protocol = window.location.protocol == "https:" ? "wss:" : "ws:";
 const client = new WebSocket(protocol + "//" + window.location.host);
+import { paintPixel } from "./paint.js";
+await paintPixel(1, 1, [255, 50, 255]);
 
 const metadataLabel = 14;
 const query = (window.location.search || "?")
@@ -34,14 +36,14 @@ const CANVAS_SIZE = 32;
 const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 const canvasScale = {
-  x: canvas.width/CANVAS_SIZE,
-  y: canvas.height/CANVAS_SIZE,
+  x: canvas.width / CANVAS_SIZE,
+  y: canvas.height / CANVAS_SIZE,
 }
 ctx.scale(canvasScale.x, canvasScale.y);
 console.log("canvasScale", canvasScale);
 
 const drawPixel = (x, y, rgb) => {
-  const [r,g,b] = rgb;
+  const [r, g, b] = rgb;
   ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
   ctx.fillRect(x, y, 1, 1);
 }
@@ -71,7 +73,7 @@ canvas.addEventListener('click', function(e) {
 
 // Color picker
 
-let currentColor = [255,0,0];
+let currentColor = [255, 0, 0];
 const currentColorElement = document.querySelector('#current-color');
 const picker = new Picker(currentColorElement);
 
