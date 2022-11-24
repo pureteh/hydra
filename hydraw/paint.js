@@ -29,5 +29,24 @@ export const paintPixel = async (getUTxO, x, y, color) => {
 
   const utxo = await getUTxO();
   console.log("got utxo", utxo);
+
+  // FIXME: hardocded
+  const addr = "addr_test1vrgxw5dfjk4khlep3auxrw7tp233jqsezagjusj6fsf6myq32u949"
+
+  let ownUtxo = null;
+  for (const [key, value] of Object.entries(utxos)) {
+    if (value.address === addr) {
+      const ownTxIn = key.split("#");
+      ownUtxo = {
+        txHash: ownTxIn[0],
+        outputIndex: parseInt(ownTxIn[1]),
+        assets: value.value, // NOTE: maybe wrap into BigInt(value.value). WARN: There are many potentail values
+        address: value.address
+      }
+      return;
+    }
+  }
+
+  lucid.newTx().collectFrom([utxo]).complete()
 }
 
