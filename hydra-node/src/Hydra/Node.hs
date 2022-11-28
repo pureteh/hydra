@@ -116,6 +116,25 @@ runHydraNode tracer node =
   -- something like 'forM_ [0..1] $ async'
   forever $ stepHydraNode tracer node
 
+-- On process les évènements les uns après les autres.
+-- Soit on sauvegarde les évènements en entrée avant de faire quoique ce soit
+-- Soit on sauvegarde après
+-- qu'est-ce que ça veut dire OnlyEffect ?
+-- c'est quoi un effect ?
+-- C'est quoi la différence avec NewState ?
+-- Un effect semble être un effet de bord qu'on souhaite avoir sur le reste du monde
+-- Autrement dit, on n'a sans doute pas envie de rejouer un effect lorsqu'on rejoue
+-- les évènement précédents.
+-- C'est sans doute pour cela qu'on a sauvegardé uniquement le chainstate ici.
+-- Il y a trois catégorie d'effect:
+
+-- * ClientEffect -> on va envoyer un message aux clients
+
+-- * NetworkEffect -> on va poster un message sur le réseau
+
+-- * ChainEffect -> on va poster une transaction on-chain
+
+-- j'ai dans l'idée qu'on ne veut vraiment refaire aucun de ces effets, en fait
 stepHydraNode ::
   ( MonadThrow m
   , MonadCatch m
@@ -126,19 +145,22 @@ stepHydraNode ::
   HydraNode tx m ->
   m ()
 stepHydraNode tracer node = do
-  e <- nextEvent eq
-  traceWith tracer $ BeginEvent party e
-  atomically (processNextEvent node e) >>= \case
+  event <- nextEvent eq
+  traceWith tracer $ BeginEvent party event
+  atomically (processNextEvent node event) >>= \case
     -- TODO(SN): Handling of 'Left' is untested, i.e. the fact that it only
     -- does trace and not throw!
-    Error err -> traceWith tracer (ErrorHandlingEvent party e err)
-    Wait _reason -> putEventAfter eq 0.1 (decreaseTTL e) >> traceWith tracer (EndEvent party e)
+    Error err -> traceWith tracer (ErrorHandlingEvent party event err)
+    -- Que fait wait exactement ?
+    Wait _reason -> putEventAfter eq 0.1 (decreaseTTL event) >> traceWith tracer (EndEvent party event)
+    -- Super louche : ça peut être NewState et Effects ou OnlyEffects
+    -- Du coup on a une duplication de code ici pour l'application des effets
     NewState s effs -> do
       save s
       forM_ effs (processEffect node tracer)
-      traceWith tracer (EndEvent party e)
+      traceWith tracer (EndEvent party event)
     OnlyEffects effs ->
-      forM_ effs (processEffect node tracer) >> traceWith tracer (EndEvent party e)
+      forM_ effs (processEffect node tracer) >> traceWith tracer (EndEvent party event)
  where
   decreaseTTL =
     \case
@@ -152,6 +174,10 @@ stepHydraNode tracer node = do
   HydraNode{persistence, eq, env} = node
 
 -- | Monadic interface around 'Hydra.Logic.update'.
+-- Ce truc va émettre un output en fonction du résultat de Logic.update
+-- qu'est-ce qu'on en fait ensuite de cet output ?
+-- est-ce qu'il faut sauvegarder l'output ?
+-- est-ce qu'il faut sauvegarder l'event ?'
 processNextEvent ::
   (IsChainState tx) =>
   HydraNode tx m ->
@@ -178,22 +204,24 @@ processEffect ::
   Tracer m (HydraNodeLog tx) ->
   Effect tx ->
   m ()
-processEffect HydraNode{hn, oc = Chain{postTx}, server, eq, env = Environment{party}} tracer e = do
-  traceWith tracer $ BeginEffect party e
-  case e of
+processEffect HydraNode{hn, oc = Chain{postTx}, server, eq, env = Environment{party}} tracer effect = do
+  traceWith tracer $ BeginEffect party effect
+  case effect of
     ClientEffect i -> sendOutput server i
     NetworkEffect msg -> broadcast hn msg >> putEvent eq (NetworkEvent defaultTTL msg)
     OnChainEffect{chainState, postChainTx} ->
       postTx chainState postChainTx
         `catch` \(postTxError :: PostTxError tx) ->
           putEvent eq $ PostTxError{postChainTx, postTxError}
-  traceWith tracer $ EndEffect party e
+  traceWith tracer $ EndEffect party effect
 -- ** Some general event queue from which the Hydra head is "fed"
 
 -- | The single, required queue in the system from which a hydra head is "fed".
 -- NOTE(SN): this probably should be bounded and include proper logging
 -- NOTE(SN): handle pattern, but likely not required as there is no need for an
 -- alternative implementation
+-- C'est là qu'on va tout ranger
+-- on pourrait en faire une event queue persistente et ce serait cool
 data EventQueue m e = EventQueue
   { putEvent :: e -> m ()
   , putEventAfter :: NominalDiffTime -> e -> m ()
@@ -207,23 +235,25 @@ createEventQueue = do
   q <- atomically newTQueue
   pure
     EventQueue
-      { putEvent =
-          atomically . writeTQueue q
+      { putEvent = push q
       , putEventAfter = \delay e -> do
           atomically $ modifyTVar' numThreads succ
           void . async $ do
             threadDelay $ realToFrac delay
             atomically $ do
               modifyTVar' numThreads pred
-              writeTQueue q e
+            push q e
       , nextEvent =
-          atomically $ readTQueue q
+          pop q
       , isEmpty = do
           atomically $ do
             n <- readTVar numThreads
             isEmpty' <- isEmptyTQueue q
             pure (isEmpty' && n == 0)
       }
+ where
+  pop q = atomically $ readTQueue q
+  push q = atomically . writeTQueue q
 
 -- ** Manage state
 

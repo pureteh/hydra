@@ -291,6 +291,7 @@ test-suite tests
     Hydra.OptionsSpec
     Hydra.PartySpec
     Hydra.PersistenceSpec
+    Hydra.PersistentQueueSpec
     Hydra.SnapshotStrategySpec
     Paths_hydra_node
     Spec
@@ -362,6 +363,7 @@ test-suite tests
     , versions
     , websockets
     , yaml
+    , unliftio
 
   build-tool-depends: hspec-discover:hspec-discover
   ghc-options:        -threaded -rtsopts
