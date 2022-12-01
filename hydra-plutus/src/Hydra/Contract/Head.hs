@@ -57,8 +57,8 @@ hydraHeadV1 = "HydraHeadV1"
 
 {-# INLINEABLE headValidator #-}
 headValidator ::
-  State ->
-  Input ->
+  DatumType ->
+  RedeemerType ->
   ScriptContext ->
   Bool
 headValidator oldState input context =
@@ -135,10 +135,13 @@ mkHeadContext context =
 --
 --   * All PTs have been burnt: The right number of Head tokens, both PT for
 --     parties and thread token, with the correct head id, are burnt,
+--     FIXME: This is not part of the spec! Not needed or enforce garbage collection?
 --
---   * All committed funds have been redistributed. This is done via v_commit
---     and it only needs to ensure that we have spent all comitted outputs,
---     which follows from burning all the PTs.
+--   * FIXME: All committed funds have been redistributed. This is done via
+--     v_commit and it only needs to ensure that we have spent all comitted
+--     outputs, which follows from burning all the PTs.
+--
+--   * The transaction is performed (i.e. signed) by one of the participants.
 checkAbort ::
   ScriptContext ->
   HeadContext ->
