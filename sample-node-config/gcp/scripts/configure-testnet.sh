@@ -23,7 +23,7 @@ export NETWORK_MAGIC=$(jq .networkMagic cardano-configurations/network/preview/g
 
 # this is manually hardcoded from https://github.com/input-output-hk/hydra-poc/releases/tag/0.8.1
 # perhaps there would be a way to look those up in the Chain?
-export HYDRA_SCRIPTS_TX_ID=4081fab39728fa3c05c0edc4dc7c0e8c45129ca6b2b70bf8600c1203a79d2c6d
+export HYDRA_SCRIPTS_TX_ID=9a078cf71042241734a2d37024e302c2badcf319f47db9641d8cb8cc506522e1
 
 [[ -L devnet/preview ]] || ln -s cardano-configurations/network/preview devnet
 

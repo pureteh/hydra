@@ -43,7 +43,7 @@ services:
         [ "--node-id", "arnaud"
         , "--api-host" , "0.0.0.0"
         , "--host", "0.0.0.0"
-        , "--port", "5003"
+        , "--port", "5001"
         , "--monitoring-port", "6001"
         , "--persistence-dir", "/hydra-data"
         , "--hydra-signing-key", "/data/keys/arnaud-hydra.sk"
@@ -59,7 +59,7 @@ services:
         # "--peer","13.39.80.222:5001" # pascal
         # "--cardano-verification-key","/data/keys/pascal.cardano.vk"
         # "--hydra-verification-key","/data/keys/pascal.hydra.vk"
-        , "--peer","13.38.49.252:5001" # sasha
+        , "--peer","13.37.150.125:5001" # sasha
         , "--cardano-verification-key","/data/keys/sasha.cardano.vk"
         , "--hydra-verification-key","/data/keys/sasha.hydra.vk"
         , "--peer","13.38.189.209:5001" # franco
@@ -69,17 +69,20 @@ services:
 
   hydra-tui:
     image: ghcr.io/input-output-hk/hydra-tui:${HYDRA_IMAGE_ID:-latest}
+    environment:
+      - TERMINFO=/terminfo
     profiles:
       - tui
     command:
       [ "--connect", "hydra-node:4001"
       , "--node-socket", "/devnet/node.socket"
       , "--network-id", "${NETWORK_MAGIC}"
-      , "--cardano-signing-key", "/data/arnaud.sk"
+      , "--cardano-signing-key", "/data/keys/arnaud.sk"
       ]
     volumes:
       - .:/data:ro
       - ./devnet:/devnet
+      - /lib/terminfo:/terminfo:ro
 
   hydraw:
     image: ghcr.io/input-output-hk/hydraw:latest
@@ -88,7 +91,7 @@ services:
     entrypoint:
       [ "hydraw" ]
     environment:
-      - HYDRAW_CARDANO_SIGNING_KEY=/data/arnaud.sk
+      - HYDRAW_CARDANO_SIGNING_KEY=/data/keys/arnaud.sk
       - HYDRA_API_HOST=hydra-node:4001
     volumes:
       - .:/data:ro
