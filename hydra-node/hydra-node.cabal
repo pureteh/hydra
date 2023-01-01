@@ -103,10 +103,12 @@ library
     Hydra.Network
     Hydra.Network.Heartbeat
     Hydra.Network.Message
+    Hydra.Network.MultiHead
     Hydra.Network.Ouroboros
     Hydra.Network.Ouroboros.Client
     Hydra.Network.Ouroboros.Server
     Hydra.Network.Ouroboros.Type
+    Hydra.Network.UDP
     Hydra.Node
     Hydra.Node.Version
     Hydra.Options
@@ -364,5 +366,5 @@ test-suite tests
     , websockets
     , yaml
 
-  build-tool-depends: hspec-discover:hspec-discover
+  build-tool-depends: hspec-discover:hspec-discover -any
   ghc-options:        -threaded -rtsopts
