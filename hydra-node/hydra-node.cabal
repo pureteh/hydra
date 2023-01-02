@@ -110,6 +110,7 @@ library
     Hydra.Network.Ouroboros.Type
     Hydra.Network.UDP
     Hydra.Node
+    Hydra.Node.MultiHeaded
     Hydra.Node.Version
     Hydra.Options
     Hydra.Party
@@ -194,6 +195,19 @@ executable hydra-node
     , hydra-cardano-api
     , hydra-node
     , hydra-prelude
+
+  ghc-options:    -threaded -rtsopts
+
+executable hydra-multi-node
+  import:         project-config
+  hs-source-dirs: exe/hydra-multi-node
+  main-is:        Main.hs
+  build-depends:
+    , base
+    , hydra-cardano-api
+    , hydra-node
+    , hydra-prelude
+    , optparse-applicative
 
   ghc-options:    -threaded -rtsopts
 
