@@ -53,9 +53,9 @@ validateTokensMinting :: ValidatorHash -> ValidatorHash -> TxOutRef -> ScriptCon
 validateTokensMinting initialValidator headValidator seedInput context =
   traceIfFalse "minted wrong" $
     participationTokensAreDistributed currency initialValidator txInfo nParties
-      && checkQuantities
-      && assetNamesInPolicy == nParties + 1
-      && seedInputIsConsumed
+      && traceIfFalse "wrong number of token qty" checkQuantities
+      && traceIfFalse "wrong number of tokens" (assetNamesInPolicy == nParties + 1)
+      && traceIfFalse "seed input not consumed" seedInputIsConsumed
  where
   currency = ownCurrencySymbol context
 
