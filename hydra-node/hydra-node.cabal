@@ -81,7 +81,7 @@ library
     Hydra.Chain.CardanoClient
     Hydra.Chain.Direct
     Hydra.Chain.Direct.Handlers
-    Hydra.Chain.Direct.MultiHead
+    Hydra.Chain.Direct.HeadObserver
     Hydra.Chain.Direct.ScriptRegistry
     Hydra.Chain.Direct.State
     Hydra.Chain.Direct.TimeHandle
