@@ -232,6 +232,7 @@ withDirectChain tracer config ctx persistedPoint wallet callback action = do
           let handler = chainSyncHandler tracer callback getTimeHandle ctx
           let intersection = toConsensusPointInMode CardanoMode chainPoint
           let client = ouroborosApplication tracer intersection queue handler wallet
+          traceWith tracer $ StartingChainFrom chainPoint
           withIOManager $ \iocp ->
             connectTo
               (localSnocket iocp)

@@ -312,7 +312,8 @@ getBabbageTxs = \case
 --
 
 data DirectChainLog
-  = ToPost {toPost :: PostChainTx Tx}
+  = StartingChainFrom {point :: ChainPoint}
+  | ToPost {toPost :: PostChainTx Tx}
   | PostingTx {txId :: Ledger.TxId StandardCrypto}
   | PostedTx {txId :: Ledger.TxId StandardCrypto}
   | PostingFailed {tx :: ValidatedTx LedgerEra, postTxError :: PostTxError Tx}
