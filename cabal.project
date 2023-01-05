@@ -31,6 +31,7 @@ packages:
   plutus-cbor
   plutus-merkle-tree
   hydraw
+  hydra-observer
 
 tests: False
 
@@ -59,6 +60,10 @@ package plutus-merkle-tree
 
 package hydra-test-utils
   tests: True
+
+package hydra-observer
+  tests: True
+  benchmarks: True
 
 -- Always show detailed output for tests
 test-show-details: direct

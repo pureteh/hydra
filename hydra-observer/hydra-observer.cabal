@@ -1,0 +1,111 @@
+cabal-version:      3.0
+name:               hydra-observer
+version:            0.9.0
+synopsis:           The Hydra node
+author:             IOG
+copyright:          2023 IOG
+license:            Apache-2.0
+license-files:
+  LICENSE
+  NOTICE
+
+extra-source-files: README.md
+
+source-repository head
+  type:     git
+  location: https://github.com/input-output-hk/hydra
+
+flag hydra-development
+  description: Disable -Werror for development
+  default:     False
+  manual:      True
+
+common project-config
+  default-language:   Haskell2010
+  default-extensions:
+    NoImplicitPrelude
+    BangPatterns
+    BinaryLiterals
+    ConstraintKinds
+    DataKinds
+    DefaultSignatures
+    DeriveAnyClass
+    DeriveDataTypeable
+    DeriveFoldable
+    DeriveFunctor
+    DeriveGeneric
+    DeriveTraversable
+    DerivingStrategies
+    EmptyDataDecls
+    ExistentialQuantification
+    FlexibleContexts
+    FlexibleInstances
+    FunctionalDependencies
+    GADTs
+    GeneralizedNewtypeDeriving
+    InstanceSigs
+    KindSignatures
+    LambdaCase
+    MultiParamTypeClasses
+    MultiWayIf
+    NamedFieldPuns
+    NumericUnderscores
+    OverloadedStrings
+    PartialTypeSignatures
+    PatternGuards
+    RankNTypes
+    ScopedTypeVariables
+    StandaloneDeriving
+    TupleSections
+    TypeFamilies
+    TypeSynonymInstances
+    ViewPatterns
+
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wredundant-constraints
+    -fprint-potential-instances
+
+  if !flag(hydra-development)
+    ghc-options: -Werror
+
+library
+  import:          project-config
+  hs-source-dirs:  src
+  exposed-modules:
+    Hydra.Chain.Direct.Observer
+    Hydra.Chain.Direct.Observer.Tx
+
+  build-depends:
+    , aeson
+    , base
+    , base16-bytestring
+    , cardano-ledger-alonzo-test
+    , cardano-ledger-core
+    , contra-tracer
+    , hydra-cardano-api
+    , hydra-node
+    , hydra-plutus
+    , hydra-prelude
+    , ouroboros-consensus
+    , ouroboros-network
+    , ouroboros-network-framework
+    , plutus-ledger-api
+
+  ghc-options:     -haddock
+
+executable hydra-observer
+  import:         project-config
+  hs-source-dirs: exe/hydra-observer
+  main-is:        Main.hs
+  build-depends:
+    , aeson
+    , base
+    , bytestring
+    , hydra-cardano-api
+    , hydra-node
+    , hydra-observer
+    , hydra-prelude
+    , optparse-applicative
+
+  ghc-options:    -threaded -rtsopts
