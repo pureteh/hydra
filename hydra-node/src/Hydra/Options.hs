@@ -493,22 +493,22 @@ startChainFromParser =
           \number, a separator ('.') and the hash of the block header. \
           \For example: 52970883.d36a9936ae7a07f5f4bdc9ad0b23761cb7b14f35007e54947e27a1510f897f04."
     )
- where
-  readChainPoint :: String -> Maybe ChainPoint
-  readChainPoint = \case
-    "0" -> Just ChainPointAtGenesis
-    chainPointStr ->
-      case T.splitOn "." (toText chainPointStr) of
-        [slotNoTxt, headerHashTxt] -> do
-          slotNo <- SlotNo <$> readMaybe (toString slotNoTxt)
-          UsingRawBytesHex headerHash <-
-            either
-              (const Nothing)
-              Just
-              (deserialiseFromRawBytesBase16 (encodeUtf8 headerHashTxt))
-          pure $ ChainPoint slotNo headerHash
-        _emptyOrSingularList ->
-          Nothing
+
+readChainPoint :: String -> Maybe ChainPoint
+readChainPoint = \case
+  "0" -> Just ChainPointAtGenesis
+  chainPointStr ->
+    case T.splitOn "." (toText chainPointStr) of
+      [slotNoTxt, headerHashTxt] -> do
+        slotNo <- SlotNo <$> readMaybe (toString slotNoTxt)
+        UsingRawBytesHex headerHash <-
+          either
+            (const Nothing)
+            Just
+            (deserialiseFromRawBytesBase16 (encodeUtf8 headerHashTxt))
+        pure $ ChainPoint slotNo headerHash
+      _emptyOrSingularList ->
+        Nothing
 
 hydraScriptsTxIdParser :: Parser TxId
 hydraScriptsTxIdParser =

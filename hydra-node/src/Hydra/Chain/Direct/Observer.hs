@@ -4,7 +4,7 @@
 
 -- | A simplified chain follower that tracks Head initialisation transactions over a
 -- network.
-module Hydra.Chain.Direct.HeadObserver where
+module Hydra.Chain.Direct.Observer where
 
 import Hydra.Prelude
 
@@ -14,7 +14,6 @@ import Hydra.Cardano.Api (
   ChainPoint,
   ConsensusMode (CardanoMode),
   NetworkId,
-  TxId,
   fromConsensusPointInMode,
   fromLedgerTx,
   getTxBody,
@@ -35,21 +34,14 @@ import Hydra.Chain.Direct.Handlers (
   onRollBackward,
   onRollForward,
  )
-import Hydra.Chain.Direct.ScriptRegistry (queryScriptRegistry)
-import Hydra.Chain.Direct.State (
-  ChainContext (..),
- )
-import Hydra.Chain.Direct.Tx (HeadInitObservation (..), observeHeadInitTx)
+import Hydra.Chain.Direct.Observer.Tx (HeadInitObservation (..), observeHeadInitTx)
 import Hydra.Chain.Direct.Util (
   Block,
   defaultCodecs,
   nullConnectTracers,
-  readKeyPair,
   versions,
  )
 import Hydra.Logging (Tracer, traceWith)
-import Hydra.Options (ChainConfig (..))
-import Hydra.Party (Party)
 import Ouroboros.Consensus.Network.NodeToClient (Codecs' (..))
 import Ouroboros.Network.Block (Point (..), Tip, blockPoint, getTipPoint)
 import Ouroboros.Network.Mux (
@@ -79,48 +71,23 @@ import Ouroboros.Network.Protocol.ChainSync.Client (
  )
 import Test.Cardano.Ledger.Alonzo.Serialisation.Generators ()
 
--- | Build the 'ChainContext' from a 'ChainConfig' and additional information.
-loadChainContext ::
-  ChainConfig ->
-  -- | Hydra party of our hydra node.
-  Party ->
-  -- | Transaction id at which to look for Hydra scripts.
-  TxId ->
-  IO ChainContext
-loadChainContext config party hydraScriptsTxId = do
-  (vk, _) <- readKeyPair cardanoSigningKey
-  scriptRegistry <- queryScriptRegistry networkId nodeSocket hydraScriptsTxId
-  pure $
-    ChainContext
-      { networkId
-      , peerVerificationKeys = []
-      , ownVerificationKey = vk
-      , ownParty = party
-      , scriptRegistry
-      , contestationPeriod
-      }
- where
-  DirectChainConfig
-    { networkId
-    , nodeSocket
-    , cardanoSigningKey
-    , contestationPeriod
-    } = config
+data ObserverConfig = ObserverConfig
+  { -- | Network identifer to which we expect to connect.
+    networkId :: NetworkId
+  , -- | Path to a domain socket used to connect to the server.
+    nodeSocket :: FilePath
+  , startChainFrom :: Maybe ChainPoint
+  }
 
 -- | A generic chain observer used to detect new heads.
 runChainObserver ::
   Tracer IO DirectChainLog ->
-  ChainConfig ->
-  -- | Last known point on chain as loaded from persistence.
-  Maybe ChainPoint ->
+  ObserverConfig ->
   -- | A callback which is passed new heads
   (HeadInitObservation -> IO ()) ->
   IO ()
-runChainObserver tracer config persistedPoint callback = do
-  chainPoint <- maybe (queryTip networkId nodeSocket) pure $ do
-    (min <$> startChainFrom <*> persistedPoint)
-      <|> persistedPoint
-      <|> startChainFrom
+runChainObserver tracer config callback = do
+  chainPoint <- maybe (queryTip networkId nodeSocket) pure $ startChainFrom
   handle onIOException $ do
     let handler = mkChainSyncHandler tracer callback networkId
     let intersection = toConsensusPointInMode CardanoMode chainPoint
@@ -132,7 +99,7 @@ runChainObserver tracer config persistedPoint callback = do
         (versions networkId client)
         nodeSocket
  where
-  DirectChainConfig{networkId, nodeSocket, startChainFrom} = config
+  ObserverConfig{networkId, nodeSocket, startChainFrom} = config
 
   onIOException :: IOException -> IO ()
   onIOException ioException =
@@ -143,7 +110,11 @@ runChainObserver tracer config persistedPoint callback = do
         , networkId
         }
 
-mkChainSyncHandler :: Tracer IO DirectChainLog -> (HeadInitObservation -> IO ()) -> NetworkId -> ChainSyncHandler IO
+mkChainSyncHandler ::
+  Tracer IO DirectChainLog ->
+  (HeadInitObservation -> IO ()) ->
+  NetworkId ->
+  ChainSyncHandler IO
 mkChainSyncHandler tracer callback networkId =
   ChainSyncHandler
     { onRollBackward
@@ -153,7 +124,7 @@ mkChainSyncHandler tracer callback networkId =
   onRollBackward :: Point Block -> IO ()
   onRollBackward rollbackPoint = do
     let point = fromConsensusPointInMode CardanoMode rollbackPoint
-    traceWith tracer $ RolledBackward{point}
+    traceWith tracer RolledBackward{point}
   -- TODO: do something with rollbacks?
 
   onRollForward :: Block -> IO ()

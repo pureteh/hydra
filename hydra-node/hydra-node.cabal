@@ -80,7 +80,8 @@ library
     Hydra.Chain.CardanoClient
     Hydra.Chain.Direct
     Hydra.Chain.Direct.Handlers
-    Hydra.Chain.Direct.HeadObserver
+    Hydra.Chain.Direct.Observer
+    Hydra.Chain.Direct.Observer.Tx
     Hydra.Chain.Direct.ScriptRegistry
     Hydra.Chain.Direct.State
     Hydra.Chain.Direct.TimeHandle
@@ -192,6 +193,21 @@ executable hydra-node
     , hydra-cardano-api
     , hydra-node
     , hydra-prelude
+
+  ghc-options:    -threaded -rtsopts
+
+executable hydra-observer
+  import:         project-config
+  hs-source-dirs: exe/hydra-observer
+  main-is:        Main.hs
+  build-depends:
+    , aeson
+    , base
+    , bytestring
+    , hydra-cardano-api
+    , hydra-node
+    , hydra-prelude
+    , optparse-applicative
 
   ghc-options:    -threaded -rtsopts
 
