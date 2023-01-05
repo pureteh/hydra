@@ -15,20 +15,21 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Base16 as Base16
 import Hydra.Cardano.Api.Prelude (Hash (PaymentKeyHash))
 import Hydra.Chain (HeadId (..))
-import Hydra.Chain.Direct.Tx (findFirst, findHeadAssetId, mkHeadId)
+import Hydra.Chain.Direct.Tx (UTxOHash (UTxOHash), findFirst, findHeadAssetId, findStateToken, mkHeadId)
 import Hydra.ContestationPeriod (ContestationPeriod, fromChain)
+import qualified Hydra.Contract.Head as Head
 import qualified Hydra.Contract.HeadState as Head
 import qualified Hydra.Contract.Initial as Initial
 import Hydra.Party (Party, partyFromChain)
 import Plutus.Orphans ()
-import Plutus.V2.Ledger.Api (fromData)
+import Plutus.V2.Ledger.Api (fromBuiltin, fromData)
+import qualified Plutus.V2.Ledger.Api as Plutus
 
 data HeadInitObservation = HeadInitObservation
   { headId :: HeadId
   , parties :: [Party]
   , contestationPeriod :: ContestationPeriod
   , cardanoKeyHashes :: [Hash PaymentKey]
-  , headInitChainPoint :: Maybe ChainPoint
   }
   deriving stock (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
@@ -72,7 +73,6 @@ observeHeadInitTx networkId tx = do
       , headId = mkHeadId headTokenPolicyId
       , parties
       , cardanoKeyHashes
-      , headInitChainPoint = Nothing
       }
  where
   headOutput = \case
@@ -106,3 +106,55 @@ observeHeadInitTx networkId tx = do
 
   fromAssetName :: AssetName -> Maybe (Hash PaymentKey)
   fromAssetName (AssetName bs) = deserialiseFromRawBytes (AsHash AsPaymentKey) bs
+
+data HeadCollectComObservation = HeadCollectComObservation
+  { headId :: HeadId
+  , utxoHash :: UTxOHash
+  }
+  deriving stock (Show, Eq, Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
+-- | Identify a collectCom tx by lookup up the output paying to Head script
+observeHeadCollectComTx ::
+  Tx ->
+  Maybe HeadCollectComObservation
+observeHeadCollectComTx tx = do
+  (_, newHeadOutput) <- findTxOutByScript @PlutusScriptV2 (utxoFromTx tx) headScript
+  headId <- findStateToken newHeadOutput
+  newHeadDatum <- lookupScriptData tx newHeadOutput
+  utxoHash <- UTxOHash <$> decodeUtxoHash newHeadDatum
+  pure
+    HeadCollectComObservation
+      { headId
+      , utxoHash
+      }
+ where
+  headScript = fromPlutusScript Head.validatorScript
+  decodeUtxoHash datum =
+    case fromData $ toPlutusData datum of
+      Just Head.Open{utxoHash} -> Just $ fromBuiltin utxoHash
+      _ -> Nothing
+
+data HeadCloseObservation = HeadCloseObservation
+  { headId :: HeadId
+  , closeContestationDeadline :: Plutus.POSIXTime
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
+-- | Identify a close tx by lookup up the output paying to the Head script.
+observeCloseTx ::
+  Tx ->
+  Maybe HeadCloseObservation
+observeCloseTx tx = do
+  (_, newHeadOutput) <- findTxOutByScript @PlutusScriptV2 (utxoFromTx tx) headScript
+  headId <- findStateToken newHeadOutput
+  newHeadDatum <- lookupScriptData tx newHeadOutput
+  closeContestationDeadline <- case fromData (toPlutusData newHeadDatum) of
+    Just Head.Closed{contestationDeadline} -> pure contestationDeadline
+    _ ->
+      Nothing
+  pure
+    HeadCloseObservation{headId, closeContestationDeadline}
+ where
+  headScript = fromPlutusScript Head.validatorScript

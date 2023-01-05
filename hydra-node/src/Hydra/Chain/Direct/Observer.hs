@@ -33,7 +33,7 @@ import Hydra.Chain.Direct.Handlers (
   onRollBackward,
   onRollForward,
  )
-import Hydra.Chain.Direct.Observer.Tx (HeadInitObservation (..), observeHeadInitTx)
+import Hydra.Chain.Direct.Observer.Tx (HeadCloseObservation, HeadCollectComObservation, HeadInitObservation (..), observeCloseTx, observeHeadCollectComTx, observeHeadInitTx)
 import Hydra.Chain.Direct.Util (
   Block,
   defaultCodecs,
@@ -78,7 +78,9 @@ data ObserverConfig = ObserverConfig
   }
 
 data ChainEvent
-  = HeadInit {headInit :: HeadInitObservation}
+  = HeadInit {point :: ChainPoint, headInit :: HeadInitObservation}
+  | HeadOpen {point :: ChainPoint, headCollectCom :: HeadCollectComObservation}
+  | HeadClose {point :: ChainPoint, headClose :: HeadCloseObservation}
   | Forward {point :: ChainPoint, txId :: Api.TxId}
   | Backward {point :: ChainPoint}
   deriving stock (Show, Generic)
@@ -133,8 +135,10 @@ mkChainSyncHandler callback networkId =
     let receivedTxs = map fromLedgerTx . toList $ getBabbageTxs blk
 
     forM_ receivedTxs $ \tx ->
-      case observeHeadInitTx networkId tx of
-        Just t -> callback $ HeadInit t{headInitChainPoint = Just point}
+      case (HeadInit point <$> observeHeadInitTx networkId tx)
+        <|> (HeadClose point <$> observeCloseTx tx)
+        <|> (HeadOpen point <$> observeHeadCollectComTx tx) of
+        Just t -> callback t
         Nothing -> callback $ Forward{point, txId = Api.getTxId (Api.getTxBody tx)}
 
 ouroborosApplication ::
