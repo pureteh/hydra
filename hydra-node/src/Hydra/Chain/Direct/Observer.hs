@@ -10,13 +10,13 @@ import Hydra.Prelude
 
 import Control.Exception (IOException)
 import Control.Tracer (nullTracer)
+
 import Hydra.Cardano.Api (
   ChainPoint,
   ConsensusMode (CardanoMode),
   NetworkId,
   fromConsensusPointInMode,
   fromLedgerTx,
-  getTxBody,
   toConsensusPointInMode,
  )
 import qualified Hydra.Cardano.Api as Api
@@ -29,7 +29,6 @@ import Hydra.Chain.Direct (
  )
 import Hydra.Chain.Direct.Handlers (
   ChainSyncHandler (..),
-  DirectChainLog (..),
   getBabbageTxs,
   onRollBackward,
   onRollForward,
@@ -80,8 +79,10 @@ data ObserverConfig = ObserverConfig
 
 data ChainEvent
   = HeadInit {headInit :: HeadInitObservation}
-  | Forward {point :: ChainPoint, tx :: Api.Tx}
+  | Forward {point :: ChainPoint, txId :: Api.TxId}
   | Backward {point :: ChainPoint}
+  deriving stock (Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
 
 -- | A generic chain observer used to detect new heads.
 runChainObserver ::
@@ -134,7 +135,7 @@ mkChainSyncHandler callback networkId =
     forM_ receivedTxs $ \tx ->
       case observeHeadInitTx networkId tx of
         Just t -> callback $ HeadInit t{headInitChainPoint = Just point}
-        Nothing -> callback $ Forward{point, tx}
+        Nothing -> callback $ Forward{point, txId = Api.getTxId (Api.getTxBody tx)}
 
 ouroborosApplication ::
   (MonadST m, MonadTimer m, MonadThrow m) =>
