@@ -33,7 +33,7 @@ import Hydra.Chain.Direct.Handlers (
   onRollBackward,
   onRollForward,
  )
-import Hydra.Chain.Direct.Observer.Tx (HeadCloseObservation, HeadCollectComObservation, HeadInitObservation (..), observeCloseTx, observeHeadCollectComTx, observeHeadInitTx)
+import Hydra.Chain.Direct.Observer.Tx (HeadCloseObservation, HeadCollectComObservation, HeadCommitObservation, HeadInitObservation (..), observeCloseTx, observeCommitTx, observeHeadCollectComTx, observeHeadInitTx)
 import Hydra.Chain.Direct.Util (
   Block,
   defaultCodecs,
@@ -79,6 +79,7 @@ data ObserverConfig = ObserverConfig
 
 data ChainEvent
   = HeadInit {point :: ChainPoint, headInit :: HeadInitObservation}
+  | HeadCommit {point :: ChainPoint, headCommit :: HeadCommitObservation}
   | HeadOpen {point :: ChainPoint, headCollectCom :: HeadCollectComObservation}
   | HeadClose {point :: ChainPoint, headClose :: HeadCloseObservation}
   | Forward {point :: ChainPoint, txId :: Api.TxId}
@@ -137,6 +138,7 @@ mkChainSyncHandler callback networkId =
     forM_ receivedTxs $ \tx ->
       case (HeadInit point <$> observeHeadInitTx networkId tx)
         <|> (HeadClose point <$> observeCloseTx tx)
+        <|> (HeadCommit point <$> observeCommitTx networkId tx)
         <|> (HeadOpen point <$> observeHeadCollectComTx tx) of
         Just t -> callback t
         Nothing -> callback $ Forward{point, txId = Api.getTxId (Api.getTxBody tx)}

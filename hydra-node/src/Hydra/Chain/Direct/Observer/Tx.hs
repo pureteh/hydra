@@ -15,8 +15,16 @@ import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Base16 as Base16
 import Hydra.Cardano.Api.Prelude (Hash (PaymentKeyHash))
 import Hydra.Chain (HeadId (..))
-import Hydra.Chain.Direct.Tx (UTxOHash (UTxOHash), findFirst, findHeadAssetId, findStateToken, mkHeadId)
+import Hydra.Chain.Direct.Tx (
+  UTxOHash (UTxOHash),
+  convertTxOut,
+  findFirst,
+  findHeadAssetId,
+  findStateToken,
+  mkHeadId,
+ )
 import Hydra.ContestationPeriod (ContestationPeriod, fromChain)
+import qualified Hydra.Contract.Commit as Commit
 import qualified Hydra.Contract.Head as Head
 import qualified Hydra.Contract.HeadState as Head
 import qualified Hydra.Contract.Initial as Initial
@@ -107,6 +115,64 @@ observeHeadInitTx networkId tx = do
   fromAssetName :: AssetName -> Maybe (Hash PaymentKey)
   fromAssetName (AssetName bs) = deserialiseFromRawBytes (AsHash AsPaymentKey) bs
 
+-- * Commit
+
+data HeadCommitObservation = HeadCommitObservation
+  { committed :: [TxOut CtxUTxO]
+  , party :: Party
+  , headId :: HeadId
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
+-- | Identify a commit tx by:
+--
+-- - Find which 'initial' tx input is being consumed,
+-- - Find the redeemer corresponding to that 'initial', which contains the tx
+--   input of the committed utxo,
+-- - Find the outputs which pays to the commit validator,
+-- - Using the datum of that output, deserialize the committed output,
+-- - Reconstruct the committed UTxO from both values (tx input and output).
+observeCommitTx ::
+  NetworkId ->
+  Tx ->
+  Maybe HeadCommitObservation
+observeCommitTx networkId tx = do
+  (_, commitOut) <- findTxOutByAddress commitAddress tx
+  dat <- getScriptData commitOut
+  (onChainParty, _, onChainCommit) <- fromData @Commit.DatumType $ toPlutusData dat
+  party <- partyFromChain onChainParty
+  headId <- mkHeadId <$> findHeadIdFromPT commitOut
+  let mCommittedTxOut = convertTxOut onChainCommit
+
+  committed <-
+    -- TODO: we do now record the TxOutRef also in the 'onChainCommit'. This
+    -- reduces the cases as we can either interpret the commit or not.
+    case mCommittedTxOut of
+      Nothing -> Just mempty
+      Just o -> Just [o]
+
+  pure
+    HeadCommitObservation
+      { party
+      , committed
+      , headId
+      }
+ where
+  findHeadIdFromPT :: TxOut ctx -> Maybe PolicyId
+  findHeadIdFromPT txOut =
+    flip findFirst (valueToList $ txOutValue txOut) $ \case
+      (AssetId pid _, q)
+        | q == 1 ->
+          Just pid
+      _ ->
+        Nothing
+
+  commitAddress = mkScriptAddress @PlutusScriptV2 networkId commitScript
+
+  commitScript = fromPlutusScript Commit.validatorScript
+
+-- * CollectCom
 data HeadCollectComObservation = HeadCollectComObservation
   { headId :: HeadId
   , utxoHash :: UTxOHash
