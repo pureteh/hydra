@@ -4,10 +4,8 @@ module Main where
 
 import Hydra.Prelude
 
-import Data.Aeson (encode)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
-import Hydra.Chain.Direct.Observer (ObserverConfig (..), runChainObserver)
+import Hydra.Chain.Direct.Observer (ObserverConfig (..))
+import Hydra.Chain.Direct.Observer.Server (runServer)
 import Hydra.Options (networkIdParser, nodeSocketParser, startChainFromParser)
 import Options.Applicative (
   Parser,
@@ -19,6 +17,7 @@ import Options.Applicative (
   info,
   progDesc,
  )
+import Prelude (read)
 
 optionsParser :: Parser ObserverConfig
 optionsParser =
@@ -40,7 +39,7 @@ toolsOptions =
 
 main :: IO ()
 main = do
+  hSetBuffering stdout NoBuffering
   config <- execParser toolsOptions
-  runChainObserver config dump
- where
-  dump e = BS.putStr $ LBS.toStrict $ encode e <> "\n"
+  port <- maybe 8000 read <$> lookupEnv "HYDRA_OBSERVER_PORT"
+  runServer port config

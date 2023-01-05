@@ -9,7 +9,12 @@ license-files:
   LICENSE
   NOTICE
 
-extra-source-files: README.md
+extra-source-files:
+  bundle.js
+  index.html
+  logo.png
+  README.md
+  style.css
 
 source-repository head
   type:     git
@@ -74,23 +79,32 @@ library
   hs-source-dirs:  src
   exposed-modules:
     Hydra.Chain.Direct.Observer
+    Hydra.Chain.Direct.Observer.Server
     Hydra.Chain.Direct.Observer.Tx
 
   build-depends:
     , aeson
     , base
     , base16-bytestring
+    , bytestring
     , cardano-ledger-alonzo-test
     , cardano-ledger-core
     , contra-tracer
+    , http-types
     , hydra-cardano-api
     , hydra-node
     , hydra-plutus
     , hydra-prelude
+    , io-classes
     , ouroboros-consensus
     , ouroboros-network
     , ouroboros-network-framework
     , plutus-ledger-api
+    , stm
+    , wai
+    , wai-websockets
+    , warp
+    , websockets
 
   ghc-options:     -haddock
 
