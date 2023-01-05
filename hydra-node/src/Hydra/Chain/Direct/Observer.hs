@@ -41,7 +41,6 @@ import Hydra.Chain.Direct.Util (
   nullConnectTracers,
   versions,
  )
-import Hydra.Logging (Tracer, traceWith)
 import Ouroboros.Consensus.Network.NodeToClient (Codecs' (..))
 import Ouroboros.Network.Block (Point (..), Tip, blockPoint, getTipPoint)
 import Ouroboros.Network.Mux (
@@ -79,17 +78,21 @@ data ObserverConfig = ObserverConfig
   , startChainFrom :: Maybe ChainPoint
   }
 
+data ChainEvent
+  = HeadInit {headInit :: HeadInitObservation}
+  | Forward {point :: ChainPoint, tx :: Api.Tx}
+  | Backward {point :: ChainPoint}
+
 -- | A generic chain observer used to detect new heads.
 runChainObserver ::
-  Tracer IO DirectChainLog ->
   ObserverConfig ->
   -- | A callback which is passed new heads
-  (HeadInitObservation -> IO ()) ->
+  (ChainEvent -> IO ()) ->
   IO ()
-runChainObserver tracer config callback = do
+runChainObserver config callback = do
   chainPoint <- maybe (queryTip networkId nodeSocket) pure $ startChainFrom
   handle onIOException $ do
-    let handler = mkChainSyncHandler tracer callback networkId
+    let handler = mkChainSyncHandler callback networkId
     let intersection = toConsensusPointInMode CardanoMode chainPoint
     let client = ouroborosApplication intersection handler
     withIOManager $ \iocp ->
@@ -110,37 +113,28 @@ runChainObserver tracer config callback = do
         , networkId
         }
 
-mkChainSyncHandler ::
-  Tracer IO DirectChainLog ->
-  (HeadInitObservation -> IO ()) ->
-  NetworkId ->
-  ChainSyncHandler IO
-mkChainSyncHandler tracer callback networkId =
+mkChainSyncHandler :: (ChainEvent -> IO ()) -> NetworkId -> ChainSyncHandler IO
+mkChainSyncHandler callback networkId =
   ChainSyncHandler
     { onRollBackward
     , onRollForward
     }
  where
+  -- TODO: do something with rollbacks?
   onRollBackward :: Point Block -> IO ()
   onRollBackward rollbackPoint = do
     let point = fromConsensusPointInMode CardanoMode rollbackPoint
-    traceWith tracer RolledBackward{point}
-  -- TODO: do something with rollbacks?
+    callback $ Backward{point}
 
   onRollForward :: Block -> IO ()
   onRollForward blk = do
     let point = fromConsensusPointInMode CardanoMode $ blockPoint blk
     let receivedTxs = map fromLedgerTx . toList $ getBabbageTxs blk
-    traceWith tracer $
-      RolledForward
-        { point
-        , receivedTxIds = Api.getTxId . getTxBody <$> receivedTxs
-        }
 
     forM_ receivedTxs $ \tx ->
       case observeHeadInitTx networkId tx of
-        Just t -> callback t{headInitChainPoint = Just point}
-        Nothing -> pure ()
+        Just t -> callback $ HeadInit t{headInitChainPoint = Just point}
+        Nothing -> callback $ Forward{point, tx}
 
 ouroborosApplication ::
   (MonadST m, MonadTimer m, MonadThrow m) =>
