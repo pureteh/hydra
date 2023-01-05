@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | Smart constructors for creating Hydra protocol transactions to be used in
 -- the 'Hydra.Chain.Direct' way of talking to the main-chain.
@@ -14,9 +15,12 @@ import Hydra.Cardano.Api
 import Hydra.Prelude
 
 import qualified Cardano.Api.UTxO as UTxO
+import qualified Cardano.Ledger.Keys as Ledger
+import Cardano.Ledger.SafeHash (originalBytes)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.Map as Map
+import Hydra.Cardano.Api.Prelude (Hash (PaymentKeyHash))
 import Hydra.Chain (HeadId (..), HeadParameters (..))
 import Hydra.Chain.Direct.ScriptRegistry (ScriptRegistry (..))
 import Hydra.Chain.Direct.TimeHandle (PointInTime)
@@ -641,8 +645,21 @@ data HeadInitObservation = HeadInitObservation
   , parties :: [Party]
   , contestationPeriod :: ContestationPeriod
   , cardanoKeyHashes :: [Hash PaymentKey]
+  , headInitChainPoint :: Maybe ChainPoint
   }
-  deriving stock (Show)
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
+-- orphans?
+instance ToJSON (Hash PaymentKey) where
+  toJSON (PaymentKeyHash (Ledger.KeyHash vkh)) =
+    Aeson.String . decodeUtf8 . Base16.encode $ originalBytes vkh
+
+instance FromJSON (Hash PaymentKey) where
+  parseJSON = Aeson.withText "Hash PaymentKey" $ \text ->
+    case Base16.decode $ encodeUtf8 text of
+      Left e -> fail e
+      Right bs -> pure $ unsafePaymentKeyHashFromBytes bs
 
 -- | Observes a newly initialised Head.
 -- This observation is based on the structure of the transaction's outputs:
@@ -670,8 +687,9 @@ observeHeadInitTx networkId tx = do
     HeadInitObservation
       { contestationPeriod
       , headId = mkHeadId headTokenPolicyId
-      , cardanoKeyHashes
       , parties
+      , cardanoKeyHashes
+      , headInitChainPoint = Nothing
       }
  where
   headOutput = \case
