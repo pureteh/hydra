@@ -15,6 +15,12 @@ function displayInit(msg) {
   title.classList.add('headId');
   title.appendChild(text(msg.headInit.headId));
 
+  const tid = elem('a');
+  tid.classList.add('txId');
+  tid.href = `https://preview.cexplorer.io/tx/${msg.txId}`;
+  tid.target = '_blank';
+  tid.appendChild(text(msg.txId));
+
   const slot = elem('span');
   slot.classList.add('slot');
   slot.appendChild(text(msg.point.slot));
@@ -48,7 +54,7 @@ function displayInit(msg) {
     tbody.append(party);
   }
 
-  initDiv.append(title,slot,blockHash, parties);
+  initDiv.append(title,tid,slot,blockHash, parties);
   display.appendChild(initDiv);
 }
 

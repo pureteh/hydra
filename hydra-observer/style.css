@@ -52,7 +52,18 @@ span.headId:before {
 
 span.headId {
   display: inline-block;
-  width: 100%;
+  width: 40%;
+}
+
+a.txId:before {
+  content: "TxId: ";
+  font-weight: bold;
+  margin-right: 0.5em;
+}
+
+a.txId  {
+  display: inline-block;
+  width: 40%;
 }
 
 span.blockHash:before {

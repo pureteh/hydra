@@ -78,10 +78,10 @@ data ObserverConfig = ObserverConfig
   }
 
 data ChainEvent
-  = HeadInit {point :: ChainPoint, headInit :: HeadInitObservation}
-  | HeadCommit {point :: ChainPoint, headCommit :: HeadCommitObservation}
-  | HeadOpen {point :: ChainPoint, headCollectCom :: HeadCollectComObservation}
-  | HeadClose {point :: ChainPoint, headClose :: HeadCloseObservation}
+  = HeadInit {point :: ChainPoint, txId :: Api.TxId, headInit :: HeadInitObservation}
+  | HeadCommit {point :: ChainPoint, txId :: Api.TxId, headCommit :: HeadCommitObservation}
+  | HeadOpen {point :: ChainPoint, txId :: Api.TxId, headCollectCom :: HeadCollectComObservation}
+  | HeadClose {point :: ChainPoint, txId :: Api.TxId, headClose :: HeadCloseObservation}
   | Forward {point :: ChainPoint, txId :: Api.TxId}
   | Backward {point :: ChainPoint}
   deriving stock (Show, Generic)
@@ -136,12 +136,13 @@ mkChainSyncHandler callback networkId =
     let receivedTxs = map fromLedgerTx . toList $ getBabbageTxs blk
 
     forM_ receivedTxs $ \tx ->
-      case (HeadInit point <$> observeHeadInitTx networkId tx)
-        <|> (HeadClose point <$> observeCloseTx tx)
-        <|> (HeadCommit point <$> observeCommitTx networkId tx)
-        <|> (HeadOpen point <$> observeHeadCollectComTx tx) of
-        Just t -> callback t
-        Nothing -> callback $ Forward{point, txId = Api.getTxId (Api.getTxBody tx)}
+      let txId = Api.getTxId (Api.getTxBody tx)
+       in case (HeadInit point txId <$> observeHeadInitTx networkId tx)
+            <|> (HeadClose point txId <$> observeCloseTx tx)
+            <|> (HeadCommit point txId <$> observeCommitTx networkId tx)
+            <|> (HeadOpen point txId <$> observeHeadCollectComTx tx) of
+            Just t -> callback t
+            Nothing -> callback $ Forward{point, txId}
 
 ouroborosApplication ::
   (MonadST m, MonadTimer m, MonadThrow m) =>
