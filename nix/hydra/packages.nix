@@ -18,4 +18,6 @@ in
   hydra-tui-static = musl64Pkgs.hydra-tui.components.exes.hydra-tui;
   hydraw = nativePkgs.hydraw.components.exes.hydraw;
   hydraw-static = musl64Pkgs.hydraw.components.exes.hydraw;
+  hydra-observer = nativePkgs.hydra-observer.components.exes.hydra-observer;
+  hydra-observer-static = musl64Pkgs.hydra-observer.components.exes.hydra-observer;
 }

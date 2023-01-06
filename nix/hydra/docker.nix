@@ -44,4 +44,13 @@ in
       Entrypoint = [ "${hydraPackages.hydraw-static}/bin/hydraw" ];
     };
   };
+
+  hydra-observer = pkgs.dockerTools.buildImage {
+    name = "hydra-observer";
+    tag = "latest";
+    created = "now";
+    config = {
+      Entrypoint = [ "${hydraPackages.hydra-observer-static}/bin/hydra-observer" ];
+    };
+  };
 }
