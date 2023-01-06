@@ -11,11 +11,15 @@ import Options.Applicative (
   Parser,
   ParserInfo,
   execParser,
+  flag,
   fullDesc,
   header,
+  help,
   helper,
   info,
+  long,
   progDesc,
+  short,
  )
 import Prelude (read)
 
@@ -25,6 +29,17 @@ optionsParser =
     <$> networkIdParser
     <*> nodeSocketParser
     <*> optional startChainFromParser
+    <*> dumpEventsParser
+
+dumpEventsParser :: Parser Bool
+dumpEventsParser =
+  flag
+    False
+    True
+    ( long "dump"
+        <> short 'd'
+        <> help "Dump events seen to stdout in JSON."
+    )
 
 toolsOptions :: ParserInfo ObserverConfig
 toolsOptions =

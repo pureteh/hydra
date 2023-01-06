@@ -74,7 +74,11 @@ data ObserverConfig = ObserverConfig
     networkId :: NetworkId
   , -- | Path to a domain socket used to connect to the server.
     nodeSocket :: FilePath
-  , startChainFrom :: Maybe ChainPoint
+  , -- | Start following the chain from a specific point in time
+    -- instead of the tip at the moment the observer starts.
+    startChainFrom :: Maybe ChainPoint
+  , -- | Dump events to `stdout`.
+    dumpEvents :: Bool
   }
 
 data ChainEvent

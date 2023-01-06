@@ -12,8 +12,11 @@ import Control.Concurrent.STM (
   writeTChan,
  )
 import Control.Monad.Class.MonadAsync (wait)
+import Control.Monad.Class.MonadSTM (modifyTVar', newTVarIO)
 import Data.Aeson (encode)
-import Hydra.Chain.Direct.Observer (ChainEvent, ObserverConfig, runChainObserver)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
+import Hydra.Chain.Direct.Observer (ChainEvent, ObserverConfig (..), runChainObserver)
 import Network.HTTP.Types.Header (HeaderName)
 import Network.HTTP.Types.Status (status200, status404, status500)
 import Network.Wai (
@@ -30,20 +33,27 @@ import Network.WebSockets (withPingThread)
 import qualified Network.WebSockets as WS
 
 runServer :: Int -> ObserverConfig -> IO ()
-runServer port config = do
+runServer port config@ObserverConfig{dumpEvents} = do
+  history <- newTVarIO mempty
   events <- newBroadcastTChanIO
   withAsync
     ( runChainObserver
         config
         ( \e -> do
-            --            dump e
-            atomically (writeTChan events e)
+            when dumpEvents $ dump e
+            atomically $ do
+              appendToHistory history e
+              writeTChan events e
         )
     )
     $ \_ ->
-      Wai.websocketsOr WS.defaultConnectionOptions (websocketApp events) httpApp
+      Wai.websocketsOr WS.defaultConnectionOptions (websocketApp history events) httpApp
         & Warp.runSettings settings
  where
+  dump e = BS.putStr $ LBS.toStrict $ encode e <> "\n"
+
+  appendToHistory h e = modifyTVar' h $ (e :)
+
   settings =
     Warp.defaultSettings
       & Warp.setPort port
@@ -54,8 +64,8 @@ runServer port config = do
             putStrLn $ "Listening on: tcp/" <> show port
         )
 
-websocketApp :: TChan ChainEvent -> WS.PendingConnection -> IO ()
-websocketApp chan pendingConnection = do
+websocketApp :: TVar IO [ChainEvent] -> TChan ChainEvent -> WS.PendingConnection -> IO ()
+websocketApp history chan pendingConnection = do
   cnx <- WS.acceptRequest pendingConnection
   putTextLn "accepted connection"
   withPingThread cnx 30 (pure ()) $
@@ -63,7 +73,11 @@ websocketApp chan pendingConnection = do
  where
   sendEvents cnx = do
     putTextLn "started thread"
-    events <- atomically $ dupTChan chan
+    (events, past) <- atomically $ do
+      ch <- dupTChan chan
+      h <- reverse <$> readTVar history
+      pure (ch, h)
+    WS.sendTextDatas cnx (encode <$> past)
     forever $ atomically (readTChan events) >>= WS.sendTextData cnx . encode
 
 httpApp :: Application
