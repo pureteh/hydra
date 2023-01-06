@@ -3,13 +3,21 @@ const client = new WebSocket(protocol + "//" + window.location.host);
 
 // Canvas
 const display = document.getElementById('main');
+var txCount = 0;
 
 const elem = (tag) => document.createElement(tag);
 const text = (txt) => document.createTextNode(txt);
 
 function displayInit(msg) {
+  txCount++;
+
+  const headDiv = elem('div');
+  headDiv.classList.add('head');
+  headDiv.id = 'head-' + msg.headInit.headId;
+
   const initDiv = elem('div');
-  initDiv.classList.add('head');
+  initDiv.classList.add('init');
+  headDiv.append(initDiv);
 
   const title = elem('span');
   title.classList.add('headId');
@@ -54,24 +62,71 @@ function displayInit(msg) {
     tbody.append(party);
   }
 
-  initDiv.append(title,tid,slot,blockHash, parties);
-  display.appendChild(initDiv);
+  initDiv.append(tid,slot,blockHash, parties);
+  display.append(title, headDiv);
 }
+
+function displayCommit(msg) {
+  txCount++;
+  const headDiv = document.getElementById('head-' + msg.headCommit.headId);
+
+  const commitDiv = elem('div');
+  commitDiv.classList.add('commit');
+  headDiv.append(commitDiv);
+
+  const tid = elem('a');
+  tid.classList.add('txId');
+  tid.href = `https://preview.cexplorer.io/tx/${msg.txId}`;
+  tid.target = '_blank';
+  tid.appendChild(text(msg.txId));
+
+  const slot = elem('span');
+  slot.classList.add('slot');
+  slot.appendChild(text(msg.point.slot));
+
+  const blockHash = elem('span');
+  blockHash.classList.add('blockHash');
+  blockHash.appendChild(text(msg.point.blockHash));
+
+  const party = elem('span');
+  party.classList.add('party');
+  party.appendChild(text(msg.headCommit.party.vkey));
+
+  const committed = elem('span');
+  committed.classList.add('committed');
+
+  const totalCommitted = msg.headCommit.committed.reduce((t, c) => t + c.value.lovelace, 0);
+  committed.appendChild(text(totalCommitted));
+
+  commitDiv.append(tid,slot,blockHash,party,committed);
+}
+
+function displayForward(msg) {
+  const slote = document.getElementById('lastSlot');
+  const blocke = document.getElementById('lastBlock');
+  const counte = document.getElementById('txCount');
+  txCount++;
+
+  slote.replaceChildren(text(msg.point.slot));
+  blocke.replaceChildren(text(msg.point.blockHash));
+  counte.replaceChildren(text(txCount));
+}
+
 
 // receive chain events through WS connection
 client.addEventListener("message", e => {
   const msg = JSON.parse(e.data);
   switch (msg.tag) {
-    case "HeadInit":
-      console.log("New head seen", msg.headInit.headId);
-      setTimeout(() => displayInit(msg), 0);
+  case "HeadInit":
+    setTimeout(() => displayInit(msg), 0);
 
-    case "HeadCommit":
+  case "HeadCommit":
+    setTimeout(() => displayCommit(msg), 0);
 
-    console.log("Commit  seen", JSON.stringify(msg));
-//      setTimeout(() => displayCommit(msg), 0);
+  case "Forward":
+    displayForward(msg);
 
-    default:
-      console.log("irrelevant message", msg);
+  default:
+    console.log("irrelevant message", msg);
   }
 });

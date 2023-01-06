@@ -37,9 +37,13 @@ header > * {
   padding: 1rem 0;
 }
 
+#main {
+  margin: 5%;
+  overflow: auto;
+}
+
 .head {
   padding: 1em;
-  border: 2px solid lightgreen;
   margin: 1em;
   background: white;
 }
@@ -55,6 +59,18 @@ span.headId {
   width: 40%;
 }
 
+.init {
+  padding: .2em;
+  margin: .2em;
+  background-color: lightblue;
+}
+
+.commit {
+  padding: .2em;
+  margin: .2em;
+  background-color: lightgreen;
+}
+
 a.txId:before {
   content: "TxId: ";
   font-weight: bold;
@@ -63,7 +79,7 @@ a.txId:before {
 
 a.txId  {
   display: inline-block;
-  width: 40%;
+  width: 100%;
 }
 
 span.blockHash:before {
@@ -86,6 +102,32 @@ span.slot:before {
 span.slot {
   display: inline-block;
   width: 25%;
+}
+
+span.party:before {
+  content: "Party: ";
+  font-weight: bold;
+  margin-right: 0.5em;
+}
+
+span.party {
+  display: inline-block;
+  width: 70%;
+}
+
+span.committed:before {
+  content: "TVL: ";
+  font-weight: bold;
+  margin-right: 0.5em;
+}
+
+span.committed {
+  display: inline-block;
+  width: 20%;
+}
+
+table.parties td {
+  font-family: monospace;
 }
 
 footer {
