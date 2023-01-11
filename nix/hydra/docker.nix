@@ -45,12 +45,12 @@ in
     };
   };
 
-  hydra-observer = pkgs.dockerTools.buildImage {
-    name = "hydra-observer";
+  hydra-explorer = pkgs.dockerTools.buildImage {
+    name = "hydra-explorer";
     tag = "latest";
     created = "now";
     config = {
-      Entrypoint = [ "${hydraPackages.hydra-observer-static}/bin/hydra-observer" ];
+      Entrypoint = [ "${hydraPackages.hydra-explorer-static}/bin/hydra-explorer" ];
     };
   };
 }

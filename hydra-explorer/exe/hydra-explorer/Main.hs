@@ -4,8 +4,8 @@ module Main where
 
 import Hydra.Prelude
 
+import Hydra.Chain.Direct.Explorer (runServer)
 import Hydra.Chain.Direct.Observer (ObserverConfig (..))
-import Hydra.Chain.Direct.Observer.Server (runServer)
 import Hydra.Options (networkIdParser, nodeSocketParser, startChainFromParser)
 import Options.Applicative (
   Parser,
@@ -49,7 +49,7 @@ toolsOptions =
     )
     ( fullDesc
         <> progDesc "Hydra Head Observer"
-        <> header "hydra-observer - A Tool to observe Heads from a chain"
+        <> header "hydra-explorer - A Tool to explore Hydra Heads living on a Cardano network"
     )
 
 main :: IO ()

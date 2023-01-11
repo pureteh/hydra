@@ -1,5 +1,5 @@
 cabal-version:      3.0
-name:               hydra-observer
+name:               hydra-explorer
 version:            0.9.0
 synopsis:           The Hydra node
 author:             IOG
@@ -78,8 +78,8 @@ library
   import:          project-config
   hs-source-dirs:  src
   exposed-modules:
+    Hydra.Chain.Direct.Explorer
     Hydra.Chain.Direct.Observer
-    Hydra.Chain.Direct.Observer.Server
     Hydra.Chain.Direct.Observer.Tx
 
   build-depends:
@@ -108,17 +108,17 @@ library
 
   ghc-options:     -haddock
 
-executable hydra-observer
+executable hydra-explorer
   import:         project-config
-  hs-source-dirs: exe/hydra-observer
+  hs-source-dirs: exe/hydra-explorer
   main-is:        Main.hs
   build-depends:
     , aeson
     , base
     , bytestring
     , hydra-cardano-api
+    , hydra-explorer
     , hydra-node
-    , hydra-observer
     , hydra-prelude
     , optparse-applicative
 

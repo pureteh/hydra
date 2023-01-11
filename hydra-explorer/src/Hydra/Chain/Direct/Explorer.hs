@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wwarn #-}
 
-module Hydra.Chain.Direct.Observer.Server where
+module Hydra.Chain.Direct.Explorer where
 
 import Hydra.Prelude
 
@@ -27,6 +27,8 @@ import Network.Wai (
   responseFile,
   responseLBS,
  )
+import Hydra.Chain.Direct.Observer.Tx (HeadCloseObservation,
+                                       HeadCollectComObservation, HeadCommitObservation, HeadInitObservation (..), observeCloseTx, observeCommitTx, observeHeadCollectComTx, observeHeadInitTx)
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Handler.WebSockets as Wai
 import Network.WebSockets (withPingThread)
