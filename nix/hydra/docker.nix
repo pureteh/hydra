@@ -52,5 +52,10 @@ in
     config = {
       Entrypoint = [ "${hydraPackages.hydra-explorer-static}/bin/hydra-explorer" ];
     };
+    copyToRoot = pkgs.buildEnv {
+      name = "ui-files";
+      paths = [  "bundle.js""index.html" "logo.png" "style.css" ];
+      pathsToLink = [ "/data" ];
+    };
   };
 }
