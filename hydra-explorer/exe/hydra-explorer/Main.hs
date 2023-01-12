@@ -6,6 +6,7 @@ import Hydra.Prelude
 
 import Hydra.Chain.Direct.Explorer (runServer)
 import Hydra.Chain.Direct.Observer (ObserverConfig (..))
+import Hydra.Network (readPort)
 import Hydra.Options (networkIdParser, nodeSocketParser, startChainFromParser)
 import Options.Applicative (
   Parser,
@@ -21,7 +22,6 @@ import Options.Applicative (
   progDesc,
   short,
  )
-import Prelude (read)
 
 optionsParser :: Parser ObserverConfig
 optionsParser =
@@ -56,5 +56,5 @@ main :: IO ()
 main = do
   hSetBuffering stdout NoBuffering
   config <- execParser toolsOptions
-  port <- maybe 8000 read <$> lookupEnv "HYDRA_OBSERVER_PORT"
+  port <- lookupEnv "HYDRA_OBSERVER_PORT" <&> fromMaybe 8000 . (>>= readPort)
   runServer port config

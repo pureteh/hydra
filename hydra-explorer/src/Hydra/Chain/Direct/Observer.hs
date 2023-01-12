@@ -8,13 +8,14 @@ module Hydra.Chain.Direct.Observer where
 
 import Hydra.Prelude
 
+import Cardano.Ledger.Slot (SlotNo)
 import Control.Exception (IOException)
 import Control.Tracer (nullTracer)
-
 import Hydra.Cardano.Api (
   ChainPoint,
   ConsensusMode (CardanoMode),
   NetworkId,
+  chainPointToSlotNo,
   fromConsensusPointInMode,
   fromLedgerTx,
   toConsensusPointInMode,
@@ -33,7 +34,16 @@ import Hydra.Chain.Direct.Handlers (
   onRollBackward,
   onRollForward,
  )
-import Hydra.Chain.Direct.Observer.Tx (HeadCloseObservation, HeadCollectComObservation, HeadCommitObservation, HeadInitObservation (..), observeCloseTx, observeCommitTx, observeHeadCollectComTx, observeHeadInitTx)
+import Hydra.Chain.Direct.Observer.Tx (
+  HeadCloseObservation,
+  HeadCollectComObservation,
+  HeadCommitObservation,
+  HeadInitObservation (..),
+  observeCloseTx,
+  observeCommitTx,
+  observeHeadCollectComTx,
+  observeHeadInitTx,
+ )
 import Hydra.Chain.Direct.Util (
   Block,
   defaultCodecs,
@@ -90,6 +100,10 @@ data ChainEvent
   | Backward {point :: ChainPoint}
   deriving stock (Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
+
+afterPoint :: Maybe SlotNo -> ChainEvent -> Bool
+afterPoint maybeSlot e =
+  maybe True (uncurry (<=)) $ (,) <$> maybeSlot <*> chainPointToSlotNo (point e)
 
 -- | A generic chain observer used to detect new heads.
 runChainObserver ::

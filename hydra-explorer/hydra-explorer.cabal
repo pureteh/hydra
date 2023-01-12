@@ -101,6 +101,7 @@ library
     , ouroboros-network-framework
     , plutus-ledger-api
     , stm
+    , text
     , wai
     , wai-websockets
     , warp
