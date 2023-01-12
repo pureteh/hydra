@@ -9,12 +9,13 @@ license-files:
   LICENSE
   NOTICE
 
-extra-source-files:
+data-files:
   bundle.js
   index.html
   logo.png
-  README.md
   style.css
+
+extra-source-files: README.md
 
 source-repository head
   type:     git
