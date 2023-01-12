@@ -1,9 +1,11 @@
 const protocol = window.location.protocol == "https:" ? "wss:" : "ws:";
-const client = new WebSocket(protocol + "//" + window.location.host);
 
 // Canvas
 const display = document.getElementById('main');
 var txCount = 0;
+var lastSlot = 0;
+var reconnectionDelay = 10;
+const ONE_MINUTE = 60000;
 
 const elem = (tag) => document.createElement(tag);
 const text = (txt) => document.createTextNode(txt);
@@ -105,16 +107,18 @@ function displayForward(msg) {
   const slote = document.getElementById('lastSlot');
   const blocke = document.getElementById('lastBlock');
   const counte = document.getElementById('txCount');
+
+  lastSlot = msg.point.slot;
   txCount++;
 
-  slote.replaceChildren(text(msg.point.slot));
+  slote.replaceChildren(text(lastSlot));
   blocke.replaceChildren(text(msg.point.blockHash));
   counte.replaceChildren(text(txCount));
 }
 
 
 // receive chain events through WS connection
-client.addEventListener("message", e => {
+const onMessage = function (e){
   const msg = JSON.parse(e.data);
   switch (msg.tag) {
   case "HeadInit":
@@ -129,4 +133,22 @@ client.addEventListener("message", e => {
   default:
     console.log("irrelevant message", msg);
   }
-});
+};
+
+// Connect with websocket protocol using `lastSlot`
+const onClose = function (e){
+  setTimeout(() => {
+    // 'exponential' backoff
+    if (reconnectionDelay < ONE_MINUTE) {
+      reconnectionDelay *= 2;
+    } else {
+      reconnectionDelay = 10;
+    }
+    const client = new WebSocket(protocol + "//" + window.location.host + window.location.pathname + '/'+ lastSlot);
+
+    client.addEventListener("message", onMessage);
+    client.addEventListener("close", onClose);
+  }, reconnectionDelay);
+};
+
+onClose();
