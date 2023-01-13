@@ -7,6 +7,7 @@
 }:
 let
   pkgs = import nixpkgs { inherit system; };
+  inherit (pkgs) lib;
 in
 {
   hydra-node = pkgs.dockerTools.buildImage {
@@ -52,9 +53,12 @@ in
     config = {
       Entrypoint = [ "${hydraPackages.hydra-explorer-static}/bin/hydra-explorer" ];
     };
-    copyToRoot = pkgs.buildEnv {
-      name = "ui-files";
-      paths = [  "bundle.js""index.html" "logo.png" "style.css" ];
-    };
+    copyToRoot = let
+      inherit (hydraPackages.hydra-explorer-static) data;
+    in pkgs.runCommand "ui-files" {} ''
+      mkdir $out
+      # XXX would be nice to predict the entire path
+      ln -s ${data}/share/*/*ghc*/${with data.identifier; lib.escapeShellArg "${name}-${version}"} $out/data
+    '';
   };
 }
