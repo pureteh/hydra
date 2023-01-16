@@ -13,8 +13,18 @@
   }
 }
 
+a.explore {
+  text-decoration: none;
+  color: black;
+}
+
+a.explore:after {
+  content: ' \2b00';
+  font-size: 130%;
+}
+
 .App-header {
-  background-color: #282c34;
+  background-color: #393A10;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -30,14 +40,14 @@
 
 /* stats section  */
 .stats {
-  background-color: white;
+  background-color: #C6C5B9;
   border-radius: 20px;
   color:black;
   width: 80%;
 }
 
 .stats h2 {
-  background-color: #999;
+  background-color: #4A6D7C;
   border-radius: 20px 20px 0 0;
   margin: 0;
   padding: .2em 0 .2em 1em;
@@ -48,6 +58,8 @@
 .stats .stat {
   display: flex;
   flex-direction: row;
+  align-items: center;
+
   margin: .2em;
 }
 
@@ -56,6 +68,7 @@
   text-align: right;
   padding: .2em;
   width: 10%;
+  color: #4A6D7C;
 }
 
 .stat span {
@@ -67,27 +80,104 @@
   display: flex;
   flex-direction: column;
   width: 80%;
-  font-size: 80%;
+  margin: 2vh 0 2vh 0;
 }
 
 .head {
-  background-color: white;
+  background-color:  #C6C5B9;
   border-radius: 20px;
   color:black;
   margin: 1em 0 0 0;
   min-height: 3em;
+  font-size: 80%;
 }
 
 .headId {
-  background-color: #999;
+  background-color: #62929E;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   border-radius: 20px 20px 0 0;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.headId label {
+  font-weight: bold;
+  text-align: left;
+  padding: .4em;
+  width: 10%;
+}
+
+.headId span {
+  text-align: left;
+  padding: .4em;
+  width: 90%;
+  font-size: 80%;
+}
+
+.txId {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.txId label {
+  font-weight: bold;
+  text-align: left;
+  padding: .4em;
+  width: 10%;
+}
+
+.txId span {
+  text-align: left;
+  padding: .4em;
+  width: 90%;
+  font-size: 80%;
+}
+
+table.parties {
+  font-size: 80%;
+  width: calc(100% - 2em);
+  padding:1em;
+  margin: 1em;
+  text-align: left;
+  table-layout: fixed;
+  border-collapse: collapse;
+  border: 3px solid #4A6D7C;
+}
+
+.parties thead {
+  background-color: #62929E;
+}
+
+.parties tbody tr:nth-child(even) {
+  background-color: #93C1CC;
+}
+
+div.point {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  font-size:80%;
+}
+
+.point label {
+  font-weight: bold;
+  margin-right: .3em;
+  margin-left: .4em;
+}
+
+tr.party
+{
+  font-size: 80%;
+}
+
+footer {
+  background-color: #C6C5B9;
+  min-height: 10vh;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: black;
 }

@@ -13,13 +13,17 @@ const initialState = {
   heads: []
 };
 
+function Block({ block }) {
+  return <a className='explore' href={'https://preview.cexplorer.io/block/' + block}>{block.substring(0, 30) + '...'}</a>
+}
+
 function Stats({ lastSlot, lastBlock, countTxs }) {
   return <div className='stats'>
     <h2>Basic stats</h2>
     <div className='stat'><label>Slot</label><span>{lastSlot}</span></div>
     <div className='stat'><label>Block</label>
       <span>
-        <a href={'https://preview.cexplorer.io/block/' + lastBlock}>{lastBlock.substring(0, 30) + '...'}</a>
+        <Block block={lastBlock} />
       </span>
     </div>
     <div className='stat'><label>Txs</label><span>{countTxs}</span></div>
@@ -27,12 +31,50 @@ function Stats({ lastSlot, lastBlock, countTxs }) {
 }
 
 function HeadId({ headId }) {
-  return <div className='headId'><label>HeadId</label><span>{headId}</span></div>;
+  return <div className='headId'><label>Head</label><span>{headId}</span></div>;
 }
 
-function Head(head) {
+function TxId({ txId }) {
+  return <div className='txId'><label>TxId</label>
+    <span>
+      <a className='explore' href={'https://preview.cexplorer.io/tx/' + txId}>{txId.substring(0, 30) + '...'}</a>
+    </span>
+  </div>;
+};
+
+function PointRef({ point }) {
+  return <div className='point'>
+    <div className='block'><label>Block</label><span><Block block={point.blockHash} /></span></div>
+    <div className='slot'><label>Slot</label><span>{point.slot}</span></div>
+  </div>;
+};
+
+function Party({ hydra, cardano }) {
+  return <tr className='party'><td>{hydra.substring(0, 40) + '...'}</td><td>{cardano.substring(0, 40) + '...'}</td></tr>
+};
+
+function Parties({ parties }) {
+  return <table className='parties'>
+    <thead>
+      <tr><th>Hydra Key</th><th>Cardano Key</th></tr>
+    </thead>
+    <tbody>
+      {parties.map((e) => {
+        return (<Party hydra={e.hydraKey} cardano={e.cardanoKey} />);
+      })}
+    </tbody>
+  </table>;
+};
+
+function Head({ head }) {
+  const parties = head.parties.map((e, i) => {
+    return { hydraKey: e.vkey, cardanoKey: head.cardanoKeyHashes[i] }
+  });
   return <div className="head">
     <HeadId headId={head.headId} />
+    <TxId txId={head.txId} />
+    <PointRef point={head.point} />
+    <Parties parties={parties} />
   </div>;
 }
 
@@ -40,7 +82,7 @@ function Head(head) {
 */
 function Heads({ heads }) {
   return <div className='heads'>
-    {heads.map(Head)}
+    {heads.map((e) => <Head key={e.headId} head={e} />)}
   </div>;
 }
 
@@ -59,7 +101,7 @@ function App() {
         case 'HeadInit':
           return {
             ...state,
-            heads: [{ headId: msg.headInit.headId }, ...state.heads]
+            heads: [{ ...msg.headInit, point: msg.point, txId: msg.txId }, ...state.heads]
           };
 
 
