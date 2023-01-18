@@ -187,6 +187,20 @@ tr.party
   font-size: 80%;
 }
 
+span.fold svg {
+  height: .8em;
+  width: auto;
+  float: right;
+  margin-right: 1em;
+}
+
+span.unfold svg {
+  height: .8em;
+  width: auto;
+  float: right;
+  margin-right: 1em;
+}
+
 footer {
   background-color: #C6C5B9;
   min-height: 5vh;

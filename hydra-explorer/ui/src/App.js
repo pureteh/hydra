@@ -1,4 +1,6 @@
 import logo from './logo.svg';
+import { ReactComponent as RightArrow } from './right_arrow.svg';
+import { ReactComponent as DownArrow } from './down_arrow.svg';
 import './App.css';
 import React, { useState, useCallback, useEffect } from 'react';
 
@@ -37,10 +39,10 @@ function HeadId({ headId, detailed, updateHead }) {
     {
       detailed
         ? <span className='fold' onClick={() => updateHead(headId, (head) => ({ ...head, detailed: false }))}>
-          &gt;
+          <DownArrow />
         </span>
         : <span className='unfold' onClick={() => updateHead(headId, (head) => ({ ...head, detailed: true }))}>
-          v
+          <RightArrow />
         </span >
     }
   </div >;
