@@ -20,18 +20,30 @@ function Block({ block }) {
 function Stats({ lastSlot, lastBlock, countTxs }) {
   return <div className='stats'>
     <h2>Basic stats</h2>
-    <div className='stat'><label>Slot</label><span>{lastSlot}</span></div>
-    <div className='stat'><label>Block</label>
-      <span>
-        <Block block={lastBlock} />
-      </span>
+    <div className='content'>
+      <div className='stat'><label>Slot</label><span>{lastSlot}</span></div>
+      <div className='stat'><label>Block</label>
+        <span>
+          <Block block={lastBlock} />
+        </span>
+      </div>
+      <div className='stat'><label>Txs</label><span>{countTxs}</span></div>
     </div>
-    <div className='stat'><label>Txs</label><span>{countTxs}</span></div>
   </div>;
 }
 
-function HeadId({ headId }) {
-  return <div className='headId'><label>Head</label><span>{headId}</span></div>;
+function HeadId({ headId, detailed, updateHead }) {
+  return <div className='headId'><label>Head</label><span>{headId}</span>
+    {
+      detailed
+        ? <span className='fold' onClick={() => updateHead(headId, (head) => ({ ...head, detailed: false }))}>
+          &gt;
+        </span>
+        : <span className='unfold' onClick={() => updateHead(headId, (head) => ({ ...head, detailed: true }))}>
+          v
+        </span >
+    }
+  </div >;
 }
 
 function TxId({ txId }) {
@@ -66,23 +78,26 @@ function Parties({ parties }) {
   </table>;
 };
 
-function Head({ head }) {
+function Head({ head, updateHead }) {
   const parties = head.parties.map((e, i) => {
     return { hydraKey: e.vkey, cardanoKey: head.cardanoKeyHashes[i] }
   });
   return <div className="head">
-    <HeadId headId={head.headId} />
-    <TxId txId={head.txId} />
-    <PointRef point={head.point} />
-    <Parties parties={parties} />
+    <HeadId headId={head.headId} detailed={head.detailed} updateHead={updateHead} />
+    {
+      head.detailed ? <> <TxId txId={head.txId} />
+        <PointRef point={head.point} />
+        <Parties parties={parties} />
+      </> : null
+    }
   </div>;
 }
 
 /** Display the list of current heads along with their status
 */
-function Heads({ heads }) {
+function Heads({ heads, updateHead }) {
   return <div className='heads'>
-    {heads.map((e) => <Head key={e.headId} head={e} />)}
+    {heads.map((e) => <Head key={e.headId} head={e} updateHead={updateHead} />)}
   </div>;
 }
 
@@ -93,7 +108,20 @@ const webSocket = new WebSocket(baseUrl);
 function App() {
   const [ws, setWs] = useState(webSocket);
   const [socketUrl, setSocketUrl] = useState(baseUrl + '/' + initialState.lastSlot);
-  const [heads, setHeads] = useState(initialState);
+  const [explorerState, setExplorerState] = useState(initialState);
+
+  /** Update a single head identified by its `headId`
+   */
+  function updateHead(headId, updateFn) {
+    const newHeads = explorerState.heads.map((head) => {
+      if (head.headId === headId) {
+        return updateFn(head);
+      } else {
+        return head;
+      }
+    });
+    setExplorerState({ ...explorerState, heads: newHeads });
+  }
 
   function updateState(msg) {
     return (state) => {
@@ -131,7 +159,7 @@ function App() {
 
     const onMessage = (e) => {
       const msg = JSON.parse(e.data);
-      setHeads(updateState(msg));
+      setExplorerState(updateState(msg));
     };
 
     ws.addEventListener("close", onClose);
@@ -151,14 +179,15 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <img alt="Hydra Logo" width="100" src="/logo.png"></img>
         <h1>Hydra Observer</h1>
-        <Stats lastSlot={heads.lastSlot}
-          lastBlock={heads.lastBlock}
-          countTxs={heads.countTxs}
-        />
-        <Heads heads={heads.heads} />
       </header>
+      <div className="App-content">
+        <Stats lastSlot={explorerState.lastSlot}
+          lastBlock={explorerState.lastBlock}
+          countTxs={explorerState.countTxs}
+        />
+        <Heads heads={explorerState.heads} updateHead={updateHead} />
+      </div>
     </div >
   );
 }

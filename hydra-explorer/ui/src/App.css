@@ -25,12 +25,23 @@ a.explore:after {
 
 .App-header {
   background-color: #393A10;
-  min-height: 100vh;
+  min-height: 3vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 1vmin);
+  color: white;
+}
+
+.App-content {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   font-size: calc(10px + 2vmin);
+  margin: 1vh 0 1vh 0;
+  overflow: auto;
   color: white;
 }
 
@@ -55,11 +66,17 @@ a.explore:after {
   text-align: left;
 }
 
+.stats .content {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  font-size: 80%;
+}
+
 .stats .stat {
   display: flex;
   flex-direction: row;
   align-items: center;
-
   margin: .2em;
 }
 
@@ -67,7 +84,6 @@ a.explore:after {
   font-weight: bold;
   text-align: right;
   padding: .2em;
-  width: 10%;
   color: #4A6D7C;
 }
 
@@ -173,11 +189,11 @@ tr.party
 
 footer {
   background-color: #C6C5B9;
-  min-height: 10vh;
+  min-height: 5vh;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
+  font-size: calc(10px + 1vmin);
   color: black;
 }
