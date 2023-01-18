@@ -29,6 +29,7 @@ import qualified Hydra.Contract.Head as Head
 import qualified Hydra.Contract.HeadState as Head
 import qualified Hydra.Contract.Initial as Initial
 import Hydra.Party (Party, partyFromChain)
+import Hydra.Snapshot (SnapshotNumber)
 import Plutus.Orphans ()
 import Plutus.V2.Ledger.Api (fromBuiltin, fromData)
 import qualified Plutus.V2.Ledger.Api as Plutus
@@ -173,6 +174,7 @@ observeCommitTx networkId tx = do
   commitScript = fromPlutusScript Commit.validatorScript
 
 -- * CollectCom
+
 data HeadCollectComObservation = HeadCollectComObservation
   { headId :: HeadId
   , utxoHash :: UTxOHash
@@ -201,6 +203,8 @@ observeHeadCollectComTx tx = do
       Just Head.Open{utxoHash} -> Just $ fromBuiltin utxoHash
       _ -> Nothing
 
+-- * Close
+
 data HeadCloseObservation = HeadCloseObservation
   { headId :: HeadId
   , closeContestationDeadline :: Plutus.POSIXTime
@@ -224,3 +228,34 @@ observeCloseTx tx = do
     HeadCloseObservation{headId, closeContestationDeadline}
  where
   headScript = fromPlutusScript Head.validatorScript
+
+-- * Contest
+
+data HeadContestObservation = HeadContestObservation
+  { headId :: HeadId
+  , contestContestationDeadline :: Plutus.POSIXTime
+  , snapshotNumber :: SnapshotNumber
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
+-- | Identify a contest tx
+-- 1. look up the output paying to the Head script.
+-- 2. find a redeemer for an input that matches a `Contest` redeemer
+observeContestTx ::
+  Tx ->
+  Maybe HeadContestObservation
+observeContestTx tx = do
+  redeemer <- findContestRedeemer
+  (_, newHeadOutput) <- findTxOutByScript @PlutusScriptV2 (utxoFromTx tx) headScript
+  headId <- findStateToken newHeadOutput
+  newState <- fromData . toPlutusData =<< lookupScriptData tx newHeadOutput
+  case (redeemer, newState) of
+    (Head.Contest{snapshotNumber}, Head.Closed{contestationDeadline}) ->
+      pure HeadContestObservation{headId, contestContestationDeadline = contestationDeadline, snapshotNumber = fromIntegral snapshotNumber}
+    _ ->
+      Nothing
+ where
+  headScript = fromPlutusScript Head.validatorScript
+
+  findContestRedeemer = listToMaybe $ mapMaybe (findRedeemerSpending @Head.Input tx) $ toList $ txInputSet tx

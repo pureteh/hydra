@@ -38,9 +38,11 @@ import Hydra.Chain.Direct.Observer.Tx (
   HeadCloseObservation,
   HeadCollectComObservation,
   HeadCommitObservation,
+  HeadContestObservation,
   HeadInitObservation (..),
   observeCloseTx,
   observeCommitTx,
+  observeContestTx,
   observeHeadCollectComTx,
   observeHeadInitTx,
  )
@@ -96,6 +98,7 @@ data ChainEvent
   | HeadCommit {point :: ChainPoint, txId :: Api.TxId, headCommit :: HeadCommitObservation}
   | HeadOpen {point :: ChainPoint, txId :: Api.TxId, headCollectCom :: HeadCollectComObservation}
   | HeadClose {point :: ChainPoint, txId :: Api.TxId, headClose :: HeadCloseObservation}
+  | HeadContest {point :: ChainPoint, txId :: Api.TxId, headContest :: HeadContestObservation}
   | Forward {point :: ChainPoint, txId :: Api.TxId}
   | Backward {point :: ChainPoint}
   deriving stock (Show, Generic)
@@ -112,7 +115,7 @@ runChainObserver ::
   (ChainEvent -> IO ()) ->
   IO ()
 runChainObserver config callback = do
-  chainPoint <- maybe (queryTip networkId nodeSocket) pure $ startChainFrom
+  chainPoint <- maybe (queryTip networkId nodeSocket) pure startChainFrom
   handle onIOException $ do
     let handler = mkChainSyncHandler callback networkId
     let intersection = toConsensusPointInMode CardanoMode chainPoint
@@ -158,7 +161,8 @@ mkChainSyncHandler callback networkId =
        in case (HeadInit point txId <$> observeHeadInitTx networkId tx)
             <|> (HeadClose point txId <$> observeCloseTx tx)
             <|> (HeadCommit point txId <$> observeCommitTx networkId tx)
-            <|> (HeadOpen point txId <$> observeHeadCollectComTx tx) of
+            <|> (HeadOpen point txId <$> observeHeadCollectComTx tx)
+            <|> (HeadContest point txId <$> observeContestTx tx) of
             Just t -> callback t
             Nothing -> callback $ Forward{point, txId}
 
