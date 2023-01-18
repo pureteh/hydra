@@ -34,8 +34,11 @@ function Stats({ lastSlot, lastBlock, countTxs }) {
   </div>;
 }
 
-function HeadId({ headId, detailed, updateHead }) {
-  return <div className='headId'><label>Head</label><span>{headId}</span>
+function HeadId({ headId, tvl, open, closed, detailed, updateHead }) {
+  const classNames = closed
+    ? 'headId closed'
+    : (open ? 'headId open' : 'headId');
+  return <div className={classNames}>
     {
       detailed
         ? <span className='fold' onClick={() => updateHead(headId, (head) => ({ ...head, detailed: false }))}>
@@ -45,6 +48,10 @@ function HeadId({ headId, detailed, updateHead }) {
           <RightArrow />
         </span >
     }
+    <label>Head</label>
+    <span>{headId}</span>
+    <span className='tvl'>{tvl}</span>
+    {closed ? <span className='deadline'>{closed.toISOString()}</span> : null}
   </div >;
 }
 
@@ -115,8 +122,9 @@ function Head({ head, updateHead }) {
   const parties = head.parties.map((e, i) => {
     return { hydraKey: e.vkey, cardanoKey: head.cardanoKeyHashes[i] }
   });
+  const tvl = head.commits.reduce((c, t) => t.totalCommitted + c, 0);
   return <div className="head">
-    <HeadId headId={head.headId} detailed={head.detailed} updateHead={updateHead} />
+    <HeadId headId={head.headId} detailed={head.detailed} open={head.open} closed={head.closed} updateHead={updateHead} tvl={tvl} />
     {
       head.detailed ? <> <TxId txId={head.txId} />
         <PointRef point={head.point} />
@@ -176,6 +184,27 @@ function App() {
   }
 
 
+  function addCollectCom(msg) {
+    return (head) => {
+      if (head.headId === msg.headCollectCom.headId) {
+        return { ...head, open: msg.headCollectCom.utxoHash }
+      } else {
+        return head;
+      }
+    }
+  }
+
+  function closeHead(msg) {
+    return (head) => {
+      if (head.headId === msg.headClose.headId) {
+        const posixTime = msg.headClose.closeContestationDeadline;
+        return { ...head, closed: new Date(posixTime) }
+      } else {
+        return head;
+      }
+    }
+  }
+
   function updateState(msg) {
     return (state) => {
       switch (msg.tag) {
@@ -185,11 +214,22 @@ function App() {
             heads: [{ ...msg.headInit, commits: [], point: msg.point, txId: msg.txId }, ...state.heads]
           };
 
-
         case "HeadCommit":
           return {
             ...state,
             heads: state.heads.map(addCommits(msg))
+          };
+
+        case "HeadOpen":
+          return {
+            ...state,
+            heads: state.heads.map(addCollectCom(msg))
+          };
+
+        case "HeadClose":
+          return {
+            ...state,
+            heads: state.heads.map(closeHead(msg))
           };
 
         case 'Forward':

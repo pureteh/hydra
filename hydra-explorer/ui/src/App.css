@@ -121,17 +121,35 @@ h3 {
   border-radius: 20px 20px 0 0;
 }
 
+.open {
+  background-color: #62aa9E;
+}
+
+.closed {
+  background-color: #cc929E;
+}
+
+.closed .deadline:before {
+  content: 'Deadline: ';
+  margin-right: .2em;
+  font-weight: bold;
+}
+
+.headId .tvl:before {
+  content: 'TVL: ';
+  margin-right: .2em;
+  font-weight: bold;
+}
+
 .headId label {
   font-weight: bold;
   text-align: left;
   padding: .4em;
-  width: 10%;
 }
 
 .headId span {
   text-align: left;
   padding: .4em;
-  width: 90%;
   font-size: 80%;
 }
 
@@ -218,15 +236,14 @@ tr.party
 span.fold svg {
   height: .8em;
   width: auto;
-  float: right;
-  margin-right: 1em;
+  float: left;
+  margin-left: 1em;
 }
 
 span.unfold svg {
   height: .8em;
   width: auto;
-  float: right;
-  margin-right: 1em;
+  margin-left: 1em;
 }
 
 footer {
