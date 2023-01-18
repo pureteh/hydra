@@ -79,7 +79,7 @@ function Parties({ parties }) {
     <h3>Parties</h3>
     <table className='parties'>
       <thead>
-        <tr><th>Hydra Key</th><th>Cardano Key</th></tr>
+        <tr><th>Hydra Key</th><th>Cardano Key Hash</th></tr>
       </thead>
       <tbody>
         {parties.map((e) => {
