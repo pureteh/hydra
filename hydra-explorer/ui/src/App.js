@@ -68,17 +68,48 @@ function Party({ hydra, cardano }) {
 };
 
 function Parties({ parties }) {
-  return <table className='parties'>
-    <thead>
-      <tr><th>Hydra Key</th><th>Cardano Key</th></tr>
-    </thead>
-    <tbody>
-      {parties.map((e) => {
-        return (<Party hydra={e.hydraKey} cardano={e.cardanoKey} />);
-      })}
-    </tbody>
-  </table>;
+  return <div>
+    <h3>Parties</h3>
+    <table className='parties'>
+      <thead>
+        <tr><th>Hydra Key</th><th>Cardano Key</th></tr>
+      </thead>
+      <tbody>
+        {parties.map((e) => {
+          return (<Party hydra={e.hydraKey} cardano={e.cardanoKey} />);
+        })}
+      </tbody>
+    </table>
+  </div>;
 };
+
+function Commit({ commit }) {
+  return <tr className='commit'>
+    <td className='vkey'>{commit.vkey.substring(0, 20) + '...'}</td>
+    <td className='totalCommitted'>{commit.totalCommitted}</td>
+    <td>
+      <a className='explore' href={'https://preview.cexplorer.io/tx/' + commit.txId}>{commit.txId.substring(0, 20) + '...'}</a>
+    </td>
+    <td classsName='slot'>{commit.slot}</td>
+    <td classsName='blockHash'>
+      <a className='explore' href={'https://preview.cexplorer.io/block/' + commit.blockHash}>{commit.blockHash.substring(0, 20) + '...'}</a>
+    </td>
+  </tr>;
+}
+
+function Commits({ commits }) {
+  return <div>
+    <h3>Commits</h3>
+    <table className='commits'>
+      <thead>
+        <tr><th>Key</th><th>TVL</th><th>Tx. Id.</th><th>Slot</th><th>Block</th></tr>
+      </thead>
+      <tbody>
+        {commits.map((c) => <Commit commit={c} />)}
+      </tbody>
+    </table>
+  </div>;
+}
 
 function Head({ head, updateHead }) {
   const parties = head.parties.map((e, i) => {
@@ -90,6 +121,7 @@ function Head({ head, updateHead }) {
       head.detailed ? <> <TxId txId={head.txId} />
         <PointRef point={head.point} />
         <Parties parties={parties} />
+        <Commits commits={head.commits} />
       </> : null
     }
   </div>;
@@ -125,18 +157,40 @@ function App() {
     setExplorerState({ ...explorerState, heads: newHeads });
   }
 
+  function addCommits(msg) {
+    return (head) => {
+      if (head.headId === msg.headCommit.headId) {
+        const totalCommitted = msg.headCommit.committed.reduce((t, c) => t + c.value.lovelace, 0);
+        const commit = {
+          vkey: msg.headCommit.party.vkey,
+          totalCommitted,
+          txId: msg.txId,
+          blockHash: msg.point.blockHash,
+          slot: msg.point.slot
+        };
+        return { ...head, commits: [...head.commits, commit] }
+      } else {
+        return head;
+      }
+    }
+  }
+
+
   function updateState(msg) {
     return (state) => {
       switch (msg.tag) {
         case 'HeadInit':
           return {
             ...state,
-            heads: [{ ...msg.headInit, point: msg.point, txId: msg.txId }, ...state.heads]
+            heads: [{ ...msg.headInit, commits: [], point: msg.point, txId: msg.txId }, ...state.heads]
           };
 
 
-        // case "HeadCommit":
-        //   setTimeout(() => displayCommit(msg), 0);
+        case "HeadCommit":
+          return {
+            ...state,
+            heads: state.heads.map(addCommits(msg))
+          };
 
         case 'Forward':
           return {

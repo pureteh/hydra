@@ -49,6 +49,11 @@ a.explore:after {
   color: #61dafb;
 }
 
+h3 {
+  text-align: left;
+  padding-left: 1em;
+}
+
 /* stats section  */
 .stats {
   background-color: #C6C5B9;
@@ -167,6 +172,29 @@ table.parties {
 
 .parties tbody tr:nth-child(even) {
   background-color: #93C1CC;
+}
+
+table.commits {
+  font-size: 80%;
+  width: calc(100% - 2em);
+  padding:1em;
+  margin: 1em;
+  text-align: left;
+  border-collapse: collapse;
+  border: 3px solid #4A6D7C;
+}
+
+.commits thead {
+  background-color: #62929E;
+}
+
+.commits tbody tr:nth-child(even) {
+  background-color: #93C1CC;
+}
+
+tr.commit
+{
+  font-size: 80%;
 }
 
 div.point {
