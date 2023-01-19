@@ -1,12 +1,10 @@
-import logo from './logo.svg';
 import { ReactComponent as RightArrow } from './right_arrow.svg';
 import { ReactComponent as DownArrow } from './down_arrow.svg';
 import './App.css';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-//const baseUrl = protocol + "//" + window.location.host + window.location.pathname;
-const baseUrl = 'ws://explorer.hydra.family';
+const baseUrl = protocol + '//' + window.location.host + window.location.pathname;
 
 const initialState = {
   lastSlot: 7126228,
@@ -16,7 +14,7 @@ const initialState = {
 };
 
 function Block({ block }) {
-  return <a className='explore' href={'https://preview.cexplorer.io/block/' + block}>{block.substring(0, 30) + '...'}</a>
+  return <a className='explore' href={'https://preview.cexplorer.io/block/' + block}>{block.substring(0, 30) + '...'}</a>;
 }
 
 function Stats({ lastSlot, lastBlock, countTxs }) {
@@ -205,48 +203,49 @@ function App() {
     }
   }
 
-  function updateState(msg) {
-    return (state) => {
-      switch (msg.tag) {
-        case 'HeadInit':
-          return {
-            ...state,
-            heads: [{ ...msg.headInit, commits: [], point: msg.point, txId: msg.txId }, ...state.heads]
-          };
-
-        case "HeadCommit":
-          return {
-            ...state,
-            heads: state.heads.map(addCommits(msg))
-          };
-
-        case "HeadOpen":
-          return {
-            ...state,
-            heads: state.heads.map(addCollectCom(msg))
-          };
-
-        case "HeadClose":
-          return {
-            ...state,
-            heads: state.heads.map(closeHead(msg))
-          };
-
-        case 'Forward':
-          return {
-            ...state,
-            countTxs: state.countTxs + 1,
-            lastSlot: msg.point.slot,
-            lastBlock: msg.point.blockHash
-          };
-        default:
-          console.log("irrelevant message", msg);
-          return state;
-      }
-    }
-  }
 
   useEffect(() => {
+    function updateState(msg) {
+      return (state) => {
+        switch (msg.tag) {
+          case 'HeadInit':
+            return {
+              ...state,
+              heads: [{ ...msg.headInit, commits: [], point: msg.point, txId: msg.txId }, ...state.heads]
+            };
+
+          case "HeadCommit":
+            return {
+              ...state,
+              heads: state.heads.map(addCommits(msg))
+            };
+
+          case "HeadOpen":
+            return {
+              ...state,
+              heads: state.heads.map(addCollectCom(msg))
+            };
+
+          case "HeadClose":
+            return {
+              ...state,
+              heads: state.heads.map(closeHead(msg))
+            };
+
+          case 'Forward':
+            return {
+              ...state,
+              countTxs: state.countTxs + 1,
+              lastSlot: msg.point.slot,
+              lastBlock: msg.point.blockHash
+            };
+          default:
+            console.log("irrelevant message", msg);
+            return state;
+        }
+      };
+    };
+
     const onClose = () => {
       setTimeout(() => {
         setWs(new WebSocket(socketUrl));
@@ -265,7 +264,7 @@ function App() {
       ws.removeEventListener("close", onClose);
       ws.removeEventListener("message", onMessage);
     };
-  }, [ws, setWs, socketUrl, setSocketUrl]);
+  }, [ws, setWs, setExplorerState, socketUrl, setSocketUrl]);
 
   // const handleClickChangeSocketUrl = useCallback(
   //   () => setSocketUrl(baseUrl + '/' + lastSlot),
