@@ -87,10 +87,8 @@ httpApp req send =
       send $
         responseLBS status200 corsHeaders ""
     ("GET", []) -> send $ handleFile "index.html"
-    ("GET", ["index.html"]) -> send $ handleFile "index.html"
-    ("GET", ["bundle.js"]) -> send $ handleFile "bundle.js"
-    ("GET", ["style.css"]) -> send $ handleFile "style.css"
-    ("GET", ["logo.png"]) -> send $ handleFile "logo.png"
+    -- FIXME: this is very dangerous, just for quick testing
+    ("GET", file) -> send $ handleFile $ concat $ intercalate "/" file
     (_, _) ->
       send handleNotFound
 
