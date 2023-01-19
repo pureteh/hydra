@@ -96,3 +96,16 @@ fromPlutusValue plutusValue =
 toPlutusValue :: Value -> Plutus.Value
 toPlutusValue =
   Ledger.transValue . toLedgerValue
+
+-- | Convert from a Plutus  `CurrencySymbol` to `PolicyId`.
+toPolicyId :: Plutus.CurrencySymbol -> PolicyId
+toPolicyId = PolicyId . unsafeScriptHashFromBytes . fromBuiltin . unCurrencySymbol
+
+-- | Convert Cardano api 'PolicyId' to Plutus `CurrencySymbol`
+-- Inverse to `toPolicyId`
+toPlutusCurrencySymbol :: PolicyId -> Plutus.CurrencySymbol
+toPlutusCurrencySymbol = Ledger.transPolicyID . toLedgerPolicyID
+
+-- | Convert Cardano api 'PolicyId' to Cardano ledger `PolicyID`
+toLedgerPolicyID :: PolicyId -> Ledger.PolicyID StandardCrypto
+toLedgerPolicyID (PolicyId sh) = Ledger.PolicyID (toShelleyScriptHash sh)
