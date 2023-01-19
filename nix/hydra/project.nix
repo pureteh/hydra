@@ -51,6 +51,7 @@ let
         packages.hydra-node.dontStrip = false;
         packages.hydra-tui.dontStrip = false;
         packages.hydraw.dontStrip = false;
+        packages.hydra-explorer.dontStrip = false;
       }
       # Set libsodium-vrf on cardano-crypto-{praos,class}. Otherwise they depend
       # on libsodium, which lacks the vrf functionality.
