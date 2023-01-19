@@ -15,6 +15,7 @@ import Control.Monad.Class.MonadSTM (modifyTVar', newTVarIO)
 import Data.Aeson (encode)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.List as List
 import Data.Text (splitOn)
 import Hydra.Cardano.Api (SlotNo (..))
 import Hydra.Chain.Direct.Observer (ChainEvent, ObserverConfig (..), afterPoint, runChainObserver)
@@ -99,7 +100,7 @@ httpApp req send =
         responseLBS status200 corsHeaders ""
     ("GET", []) -> send $ handleFile "index.html"
     -- FIXME: do proper file serving, this is dangerous
-    ("GET", path) -> send $ handleFile $ concat $ intercalate ("." : path)
+    ("GET", path) -> send $ handleFile $ toString $ mconcat $ List.intersperse "/" ("." : path)
     (_, _) ->
       send handleNotFound
 
