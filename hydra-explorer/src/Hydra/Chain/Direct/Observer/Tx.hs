@@ -13,6 +13,7 @@ import qualified Cardano.Ledger.Keys as Ledger
 import Cardano.Ledger.SafeHash (originalBytes)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Base16 as Base16
+import Data.List.NonEmpty (groupBy)
 import Hydra.Cardano.Api.Prelude (Hash (PaymentKeyHash))
 import Hydra.Chain (HeadId (..))
 import Hydra.Chain.Direct.Tx (
@@ -21,6 +22,7 @@ import Hydra.Chain.Direct.Tx (
   findFirst,
   findHeadAssetId,
   findStateToken,
+  hydraHeadV1AssetName,
   mkHeadId,
  )
 import Hydra.ContestationPeriod (ContestationPeriod, fromChain)
@@ -259,3 +261,28 @@ observeContestTx tx = do
   headScript = fromPlutusScript Head.validatorScript
 
   findContestRedeemer = listToMaybe $ mapMaybe (findRedeemerSpending @Head.Input tx) $ toList $ txInputSet tx
+
+data FanoutObservation = FanoutObservation
+  { headId :: HeadId
+  , outputs :: [TxOut CtxUTxO]
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (ToJSON, FromJSON)
+
+-- | Identify a fanout tx by looking up the burning of ST and PTs.
+-- TODO: this is weak as there could be txs forging the exact same
+-- structure of minting/burning tokens but why?
+observeFanoutTx ::
+  Tx ->
+  Maybe FanoutObservation
+observeFanoutTx tx = do
+  let burnt =
+        filter ((hydraHeadV1AssetName `elem`) . snd) $
+          fmap (\toks -> (fst (head toks), snd <$> toks)) $
+            groupBy ((==) `on` fst) $
+              [ (policyId, assetName)
+              | (AssetId policyId assetName, -1) <- txMintAssets tx
+              ]
+  case burnt of
+    [(policyId, _)] -> pure $ FanoutObservation{headId = mkHeadId policyId, outputs = toUTxOContext <$> txOuts' tx}
+    _ -> Nothing
