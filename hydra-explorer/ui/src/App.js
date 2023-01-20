@@ -17,7 +17,7 @@ function Block({ block }) {
   return <a className='explore' href={'https://preview.cexplorer.io/block/' + block}>{block.substring(0, 30) + '...'}</a>;
 }
 
-function Stats({ lastSlot, lastBlock, countTxs }) {
+function Stats({ lastSlot, lastBlock, countTxs, heads }) {
   return <div className='stats'>
     <h2>Basic stats</h2>
     <div className='content'>
@@ -28,6 +28,13 @@ function Stats({ lastSlot, lastBlock, countTxs }) {
         </span>
       </div>
       <div className='stat'><label>Txs</label><span>{countTxs}</span></div>
+    </div>
+    <div className='headsStat content'>
+      <h2>Heads </h2>
+      <div className='stat'><label>Open</label><span>{heads.open}</span></div>
+      <div className='stat'><label>Closed</label><span>{heads.closed}</span></div>
+      <div className='stat'><label>Total</label><span>{heads.total}</span></div>
+      <div className='stat'><label>TVL</label><span>{heads.tvl}</span></div>
     </div>
   </div>;
 }
@@ -116,13 +123,16 @@ function Commits({ commits }) {
   </div>;
 }
 
+function totalValueLocked(head) {
+  return head.commits.reduce((c, t) => t.totalCommitted + c, 0);
+}
+
 function Head({ head, updateHead }) {
   const parties = head.parties.map((e, i) => {
     return { hydraKey: e.vkey, cardanoKey: head.cardanoKeyHashes[i] }
   });
-  const tvl = head.commits.reduce((c, t) => t.totalCommitted + c, 0);
   return <div className="head">
-    <HeadId headId={head.headId} detailed={head.detailed} open={head.open} closed={head.closed} updateHead={updateHead} tvl={tvl} />
+    <HeadId headId={head.headId} detailed={head.detailed} open={head.open} closed={head.closed} updateHead={updateHead} tvl={totalValueLocked(head)} />
     {
       head.detailed ? <> <TxId txId={head.txId} />
         <PointRef point={head.point} />
@@ -203,49 +213,48 @@ function App() {
     }
   }
 
+  function updateState(msg) {
+    return (state) => {
+      switch (msg.tag) {
+        case 'HeadInit':
+          return {
+            ...state,
+            heads: [{ ...msg.headInit, commits: [], point: msg.point, txId: msg.txId }, ...state.heads]
+          };
+
+        case "HeadCommit":
+          return {
+            ...state,
+            heads: state.heads.map(addCommits(msg))
+          };
+
+        case "HeadOpen":
+          return {
+            ...state,
+            heads: state.heads.map(addCollectCom(msg))
+          };
+
+        case "HeadClose":
+          return {
+            ...state,
+            heads: state.heads.map(closeHead(msg))
+          };
+
+        case 'Forward':
+          return {
+            ...state,
+            countTxs: state.countTxs + 1,
+            lastSlot: msg.point.slot,
+            lastBlock: msg.point.blockHash
+          };
+        default:
+          console.log("irrelevant message", msg);
+          return state;
+      }
+    }
+  }
 
   useEffect(() => {
-    function updateState(msg) {
-      return (state) => {
-        switch (msg.tag) {
-          case 'HeadInit':
-            return {
-              ...state,
-              heads: [{ ...msg.headInit, commits: [], point: msg.point, txId: msg.txId }, ...state.heads]
-            };
-
-          case "HeadCommit":
-            return {
-              ...state,
-              heads: state.heads.map(addCommits(msg))
-            };
-
-          case "HeadOpen":
-            return {
-              ...state,
-              heads: state.heads.map(addCollectCom(msg))
-            };
-
-          case "HeadClose":
-            return {
-              ...state,
-              heads: state.heads.map(closeHead(msg))
-            };
-
-          case 'Forward':
-            return {
-              ...state,
-              countTxs: state.countTxs + 1,
-              lastSlot: msg.point.slot,
-              lastBlock: msg.point.blockHash
-            };
-          default:
-            console.log("irrelevant message", msg);
-            return state;
-        }
-      };
-    };
-
     const onClose = () => {
       setTimeout(() => {
         setWs(new WebSocket(socketUrl));
@@ -264,12 +273,21 @@ function App() {
       ws.removeEventListener("close", onClose);
       ws.removeEventListener("message", onMessage);
     };
-  }, [ws, setWs, setExplorerState, socketUrl, setSocketUrl]);
+  }, [ws, setWs, socketUrl, setSocketUrl]);
 
   // const handleClickChangeSocketUrl = useCallback(
   //   () => setSocketUrl(baseUrl + '/' + lastSlot),
   //   [lastSlot]
   // );
+
+  function headsStats(heads) {
+    const total = heads.length;
+    const closed = heads.filter((h) => h.closed).length;
+    const open = heads.filter((h) => h.open && !h.closed).length;
+    const tvl = heads.reduce((t, h) => t + totalValueLocked(h), 0);
+
+    return { total, closed, open, tvl };
+  }
 
   return (
     <div className="App">
@@ -280,6 +298,7 @@ function App() {
         <Stats lastSlot={explorerState.lastSlot}
           lastBlock={explorerState.lastBlock}
           countTxs={explorerState.countTxs}
+          heads={headsStats(explorerState.heads)}
         />
         <Heads heads={explorerState.heads} updateHead={updateHead} />
       </div>

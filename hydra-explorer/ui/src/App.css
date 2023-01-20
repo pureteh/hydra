@@ -97,6 +97,11 @@ h3 {
   padding: .2em;
 }
 
+.headsStat h2 {
+  border-radius: 0;
+  width: 100%;
+}
+
 .heads {
   display: flex;
   flex-direction: column;
