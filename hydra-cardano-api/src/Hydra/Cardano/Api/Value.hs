@@ -86,9 +86,6 @@ fromPlutusValue plutusValue =
     | cs == adaSymbol && tk == adaToken = (AdaAssetId, Quantity i)
     | otherwise = (AssetId (toPolicyId cs) (toAssetName tk), Quantity i)
 
-  toPolicyId :: Plutus.CurrencySymbol -> PolicyId
-  toPolicyId = PolicyId . unsafeScriptHashFromBytes . fromBuiltin . unCurrencySymbol
-
   toAssetName :: Plutus.TokenName -> AssetName
   toAssetName = AssetName . fromBuiltin . unTokenName
 
