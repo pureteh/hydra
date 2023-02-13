@@ -43,7 +43,7 @@ PlutusTx.unstableMakeIsData ''CommitRedeemer
 -- between on- and off-chain code to be hashed in the validators.
 data Commit = Commit
   { input :: TxOutRef
-  , preSerializedOutput :: BuiltinByteString
+  , hashedOutput :: BuiltinByteString
   }
   deriving (Haskell.Eq, Haskell.Show, Haskell.Ord)
 
@@ -57,18 +57,19 @@ PlutusTx.unstableMakeIsData ''Commit
 -- NOTE: Depends on the 'Serialise' instance for Plutus' 'Data'.
 serializeCommit :: (OffChain.TxIn, OffChain.TxOut CtxUTxO) -> Maybe Commit
 serializeCommit (i, o) = do
-  preSerializedOutput <- toBuiltin . toStrict . serialise . toData <$> toPlutusTxOut o
+  hashedOutput <- sha2_256 . toBuiltin . toStrict . serialise . toData <$> toPlutusTxOut o
   pure
     Commit
       { input = toPlutusTxOutRef i
-      , preSerializedOutput
+      , hashedOutput
       }
 
 -- | Decode an on-chain 'SerializedTxOut' back into an off-chain 'TxOut'.
 -- NOTE: Depends on the 'Serialise' instance for Plutus' 'Data'.
+-- FIXME: this is obviously broken now
 deserializeCommit :: Commit -> Maybe (OffChain.TxIn, OffChain.TxOut CtxUTxO)
-deserializeCommit Commit{input, preSerializedOutput} =
-  case deserialiseOrFail . fromStrict $ fromBuiltin preSerializedOutput of
+deserializeCommit Commit{input, hashedOutput} =
+  case deserialiseOrFail . fromStrict $ fromBuiltin hashedOutput of
     Left{} -> Nothing
     Right dat -> do
       txOut <- fromPlutusTxOut network <$> fromData dat
@@ -80,7 +81,7 @@ deserializeCommit Commit{input, preSerializedOutput} =
 -- TODO: Party is not used on-chain but is needed off-chain while it's still
 -- based on mock crypto. When we move to real crypto we could simply use
 -- the PT's token name to identify the committing party
-type DatumType = (Party, ValidatorHash, Maybe Commit, CurrencySymbol)
+type DatumType = (Party, Maybe Commit, CurrencySymbol)
 type RedeemerType = CommitRedeemer
 
 -- | The v_commit validator verifies that:
@@ -91,7 +92,7 @@ type RedeemerType = CommitRedeemer
 --
 --   * ST is present in the output if the redeemer is 'ViaCollectCom'
 validator :: DatumType -> RedeemerType -> ScriptContext -> Bool
-validator (_party, _headScriptHash, _commit, headId) r ctx =
+validator (_party, _commit, headId) r ctx =
   case r of
     -- NOTE: The reimbursement of the committed output 'commit' is
     -- delegated to the 'head' script who has more information to do it.

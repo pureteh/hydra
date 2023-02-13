@@ -24,20 +24,10 @@ type TxBuilder = TxBodyContent BuildTx
 unsafeBuildTransaction :: HasCallStack => TxBuilder -> Tx
 unsafeBuildTransaction builder =
   either
-    (\txBodyError -> bug $ InvalidTransactionException{txBodyError, builder})
+    (\txBodyError -> error . fromString $ displayError txBodyError)
     (`Tx` mempty)
     . makeTransactionBody
     $ builder
-
--- | A runtime exception to capture (programmer) failures when building
--- transactions. This should never happened in practice (famous last words...)!
-data InvalidTransactionException = InvalidTransactionException
-  { txBodyError :: TxBodyError
-  , builder :: TxBuilder
-  }
-  deriving (Show)
-
-instance Exception InvalidTransactionException
 
 -- * Constructing
 

@@ -78,7 +78,7 @@ spec = parallel $ do
   describe "TxOut hashing" $ do
     modifyMaxSuccess (const 20) $ do
       prop "OffChain.hashUTxO == OnChain.hashTxOuts (on sorted tx outs)" prop_consistentOnAndOffChainHashOfTxOuts
-      prop "OnChain.hashPreSerializedCommits == OnChain.hashTxOuts (on sorted tx outs)" prop_consistentHashPreSerializedCommits
+      prop "OnChain.hashCommits == OnChain.hashTxOuts (on sorted tx outs)" prop_consistentHashPreSerializedCommits
       prop "does care about ordering of TxOut" prop_hashingCaresAboutOrderingOfTxOuts
 
   describe "Serializing commits" $
@@ -171,7 +171,7 @@ prop_consistentHashPreSerializedCommits =
     let unsortedUTxOPairs = UTxO.pairs utxo
         toFanoutTxOuts = mapMaybe (toPlutusTxOut . snd) $ sortOn fst unsortedUTxOPairs
         serializedCommits = mapMaybe Commit.serializeCommit unsortedUTxOPairs
-        hashedCommits = OnChain.hashPreSerializedCommits serializedCommits
+        hashedCommits = OnChain.hashCommits serializedCommits
         hashedTxOuts = OnChain.hashTxOuts toFanoutTxOuts
      in hashedCommits === hashedTxOuts
           & counterexample ("Hashed commits: " <> decodeUtf8 (Base16.encode $ fromBuiltin hashedCommits))

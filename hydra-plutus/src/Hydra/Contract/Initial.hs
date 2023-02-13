@@ -125,9 +125,9 @@ checkCommit commitValidator committedRef context@ScriptContext{scriptContextTxIn
         traceError "nothing committed, but TxOut in output datum"
       (Just{}, Nothing) ->
         traceError "committed TxOut, but nothing in output datum"
-      (Just (ref, txOut), Just Commit{input, preSerializedOutput}) ->
+      (Just (ref, txOut), Just Commit{input, hashedOutput}) ->
         traceIfFalse "mismatch committed TxOut in datum" $
-          Builtins.serialiseData (toBuiltinData txOut) == preSerializedOutput
+          Builtins.sha2_256 (Builtins.serialiseData (toBuiltinData txOut)) == hashedOutput
             && ref == input
 
   initialValue =
@@ -154,7 +154,7 @@ checkCommit commitValidator committedRef context@ScriptContext{scriptContextTxIn
               Just da ->
                 case fromBuiltinData @Commit.DatumType $ getDatum da of
                   Nothing -> traceError "expected commit datum type, got something else"
-                  Just (_party, _headScriptHash, mCommit, _headId) ->
+                  Just (_party, mCommit, _headId) ->
                     mCommit
       _ -> traceError "expected single commit output"
 

@@ -14,9 +14,12 @@ import Hydra.Cardano.Api
 import Hydra.Prelude
 
 import qualified Cardano.Api.UTxO as UTxO
+import qualified Cardano.Ledger.BaseTypes as Ledger
+import Codec.Serialise (deserialiseOrFail, serialise)
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString.Base16 as Base16
 import qualified Data.Map as Map
+import Data.Maybe (fromJust)
 import Hydra.Chain (HeadId (..), HeadParameters (..))
 import Hydra.Chain.Direct.ScriptRegistry (ScriptRegistry (..))
 import Hydra.Chain.Direct.TimeHandle (PointInTime)
@@ -49,7 +52,7 @@ import Hydra.Ledger.Cardano.Builder (
 import Hydra.Party (Party, partyFromChain, partyToChain)
 import Hydra.Snapshot (Snapshot (..), SnapshotNumber, fromChainSnapshot)
 import Plutus.Orphans ()
-import Plutus.V2.Ledger.Api (CurrencySymbol (CurrencySymbol), fromBuiltin, fromData, toBuiltin)
+import Plutus.V2.Ledger.Api (CurrencySymbol (CurrencySymbol), fromBuiltin, fromData, toBuiltin, toData)
 import qualified Plutus.V2.Ledger.Api as Plutus
 
 -- | Needed on-chain data to create Head transactions.
@@ -180,7 +183,17 @@ commitTx scriptRegistry networkId headId party utxo (initialInput, out, vkh) =
       & addVkInputs (maybeToList mCommittedInput)
       & addExtraRequiredSigners [vkh]
       & addOutputs [commitOutput]
+      & \b -> b{txMetadata = TxMetadataInEra $ TxMetadata $ Map.fromList [(123, TxMetaBytes serializedOutput)]}
  where
+  serializedOutput =
+    let dat = toData $ case utxo of
+          Just (_i, o) ->
+            case toPlutusTxOut o of
+              Nothing -> error "failed to convert txOut"
+              Just pout -> Just pout
+          Nothing -> Nothing
+     in traceShow dat $ toStrict $ serialise dat
+
   initialWitness =
     BuildTxWith $
       ScriptWitness scriptWitnessCtx $
@@ -209,7 +222,7 @@ commitTx scriptRegistry networkId headId party utxo (initialInput, out, vkh) =
 
 mkCommitDatum :: Party -> Plutus.ValidatorHash -> Maybe (TxIn, TxOut CtxUTxO) -> CurrencySymbol -> Plutus.Datum
 mkCommitDatum party headValidatorHash utxo headId =
-  Commit.datum (partyToChain party, headValidatorHash, serializedUTxO, headId)
+  Commit.datum (partyToChain party, serializedUTxO, headId)
  where
   serializedUTxO = case utxo of
     Nothing ->
@@ -269,11 +282,11 @@ collectComTx networkId vk initialThreadOutput commits headId =
   extractCommit d =
     case fromData $ toPlutusData d of
       Nothing -> error "SNAFU"
-      Just ((_, _, Just o, _) :: Commit.DatumType) -> Just o
+      Just ((_, Just o, _) :: Commit.DatumType) -> Just o
       _ -> Nothing
 
   utxoHash =
-    Head.hashPreSerializedCommits $ mapMaybe (extractCommit . snd . snd) $ Map.toList commits
+    Head.hashCommits $ mapMaybe (extractCommit . snd . snd) $ Map.toList commits
 
   mkCommit (commitInput, (_commitOutput, commitDatum)) =
     ( commitInput
@@ -676,18 +689,18 @@ observeCommitTx networkId initials tx = do
 
   (commitIn, commitOut) <- findTxOutByAddress commitAddress tx
   dat <- getScriptData commitOut
-  (onChainParty, _, onChainCommit, _headId) <- fromData @Commit.DatumType $ toPlutusData dat
+  (onChainParty, onChainCommit, _headId) <- fromData @Commit.DatumType $ toPlutusData dat
   party <- partyFromChain onChainParty
 
   committed <-
     -- TODO: We could simplify this by just using the datum. However, we would
     -- need to ensure the commit is belonging to a head / is rightful. By just
     -- looking for some known initials we achieve this (a bit complicated) now.
-    case (mCommittedTxIn, onChainCommit >>= Commit.deserializeCommit) of
+    case (mCommittedTxIn, deserializedOutput) of
       (Nothing, Nothing) -> Just mempty
-      (Just i, Just (_i, o)) -> Just $ UTxO.singleton (i, o)
+      (Just i, Just o) -> Just $ UTxO.singleton (i, o)
       (Nothing, Just{}) -> error "found commit with no redeemer out ref but with serialized output."
-      (Just{}, Nothing) -> error "found commit with redeemer out ref but with no serialized output."
+      (Just{}, Nothing) -> error $ "found commit with redeemer out ref but with no serialized output.\n" <> show tx
 
   pure
     CommitObservation
@@ -696,6 +709,22 @@ observeCommitTx networkId initials tx = do
       , committed
       }
  where
+  deserializedOutput =
+    case metadata of
+      TxMetadataNone -> error "expected metadata"
+      TxMetadataInEra (TxMetadata md) ->
+        case Map.lookup 123 md of
+          Just (TxMetaBytes bs) ->
+            case deserialiseOrFail $ fromStrict bs of
+              Left{} -> error "failed to deserialise"
+              Right dat -> traceShow dat $ do
+                case fromData dat of
+                  Just (x :: Maybe Plutus.TxOut) -> traceShow x $ fromPlutusTxOut Ledger.Testnet <$> x
+                  Nothing -> Nothing
+          _ -> error "missing or wrong metadata entry"
+
+  TxBody TxBodyContent{txMetadata = metadata} = getTxBody tx
+
   findInitialTxIn =
     case filter (`elem` initials) (txIns' tx) of
       [input] -> Just input

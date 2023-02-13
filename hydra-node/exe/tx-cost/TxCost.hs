@@ -84,15 +84,13 @@ computeInitCost = do
 
 computeCommitCost :: IO [(NumUTxO, TxSize, MemUnit, CpuUnit, Lovelace)]
 computeCommitCost = do
-  interesting <- catMaybes <$> mapM compute [1, 2, 3, 5, 10, 50, 100]
-  limit <- maybeToList . getFirst <$> foldMapM (fmap First . compute) [500, 499 .. 101]
-  pure $ interesting <> limit
+  maybeToList <$> compute 1
  where
   compute numUTxO = do
     utxo <- generate $ genUTxOAdaOnlyOfSize numUTxO
     (commitTx, knownUtxo) <- generate $ genCommitTx utxo
     case commitTx of
-      Left _ -> pure Nothing
+      Left e -> traceShow e $ pure Nothing
       Right tx ->
         case checkSizeAndEvaluate tx (utxo <> knownUtxo) of
           Just (txSize, memUnit, cpuUnit, minFee) ->
@@ -235,7 +233,7 @@ checkSizeAndEvaluate :: Tx -> UTxO -> Maybe (TxSize, MemUnit, CpuUnit, Lovelace)
 checkSizeAndEvaluate tx knownUTxO = do
   guard $ txSize < maxTxSize
   case evaluateTx tx knownUTxO of
-    (Right report) -> do
+    (Right report) -> traceShow report $ do
       let results = Map.elems report
       guard $ all isRight results
       let totalMemory = sum $ executionMemory <$> rights results
@@ -244,7 +242,7 @@ checkSizeAndEvaluate tx knownUTxO = do
       guard $ totalCpu <= maxCpu
       let minFee = estimateMinFee tx report
       Just (TxSize txSize, MemUnit totalMemory, CpuUnit totalCpu, minFee)
-    _ -> Nothing
+    e -> traceShow e Nothing
  where
   txSize = fromIntegral $ LBS.length $ serialize tx
 

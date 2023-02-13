@@ -7,7 +7,7 @@ module Hydra.Contract.Head (
   DatumType,
   RedeemerType,
   headValidator,
-  hashPreSerializedCommits,
+  hashCommits,
   hashTxOuts,
   verifyPartySignature,
   verifySnapshotSignature,
@@ -129,7 +129,7 @@ checkAbort ctx@ScriptContext{scriptContextTxInfo = txInfo} headCurrencySymbol pa
     hashTxOuts $ take (length commited) (txInfoOutputs txInfo)
 
   hashOfCommittedUTxO =
-    hashPreSerializedCommits commited
+    hashCommits commited
 
   commited = committedUTxO [] (txInfoInputs txInfo)
 
@@ -186,7 +186,7 @@ checkCollectCom ctx@ScriptContext{scriptContextTxInfo = txInfo} (contestationPer
  where
   mustCollectUtxoHash =
     traceIfFalse "incorrect utxo hash" $
-      utxoHash == hashPreSerializedCommits collectedCommits
+      utxoHash == hashCommits collectedCommits
 
   mustNotChangeParameters =
     traceIfFalse "changed parameters" $
@@ -242,7 +242,7 @@ commitDatum :: TxInfo -> TxOut -> Maybe Commit
 commitDatum txInfo input = do
   let datum = findTxOutDatum txInfo input
   case fromBuiltinData @Commit.DatumType $ getDatum datum of
-    Just (_party, _validatorHash, commit, _headId) ->
+    Just (_party, commit, _headId) ->
       commit
     Nothing -> Nothing
 {-# INLINEABLE commitDatum #-}
@@ -556,12 +556,12 @@ findTxOutDatum txInfo o =
 {-# INLINEABLE findTxOutDatum #-}
 
 -- | Hash a potentially unordered list of commits by sorting them, concatenating
--- their 'preSerializedOutput' bytes and creating a SHA2_256 digest over that.
-hashPreSerializedCommits :: [Commit] -> BuiltinByteString
-hashPreSerializedCommits commits =
-  sha2_256 . foldMap preSerializedOutput $
+-- their 'hashedOutput' bytes.
+hashCommits :: [Commit] -> BuiltinByteString
+hashCommits commits =
+  foldMap hashedOutput $
     sortBy (\a b -> compareRef (input a) (input b)) commits
-{-# INLINEABLE hashPreSerializedCommits #-}
+{-# INLINEABLE hashCommits #-}
 
 -- | Hash a pre-ordered list of transaction outputs by serializing each
 -- individual 'TxOut', concatenating all bytes together and creating a SHA2_256

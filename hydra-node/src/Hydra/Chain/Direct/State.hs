@@ -90,7 +90,7 @@ import Hydra.ContestationPeriod (ContestationPeriod)
 import Hydra.Crypto (HydraKey, generateSigningKey)
 import Hydra.Data.ContestationPeriod (posixToUTCTime)
 import Hydra.Ledger (IsTx (hashUTxO))
-import Hydra.Ledger.Cardano (genOneUTxOFor, genTxIn, genUTxOAdaOnlyOfSize, genVerificationKey)
+import Hydra.Ledger.Cardano (adaOnly, genOneUTxOFor, genTxIn, genUTxOAdaOnlyOfSize, genVerificationKey)
 import Hydra.Ledger.Cardano.Evaluate (genPointInTimeBefore, genValidityBoundsFromContestationPeriod, slotNoFromUTCTime)
 import Hydra.Ledger.Cardano.Json ()
 import Hydra.Options (maximumNumberOfParties)
@@ -838,10 +838,7 @@ genCommits ctx txInit = do
 
 genCommit :: Gen UTxO
 genCommit =
-  frequency
-    [ (1, pure mempty)
-    , (10, genVerificationKey >>= genOneUTxOFor)
-    ]
+  genVerificationKey >>= fmap (fmap adaOnly) . genOneUTxOFor
 
 genCollectComTx :: Gen (ChainContext, [UTxO], InitialState, Tx)
 genCollectComTx = do
