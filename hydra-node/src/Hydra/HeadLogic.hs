@@ -599,7 +599,7 @@ onOpenClientNewTx ::
   tx ->
   Outcome tx
 onOpenClientNewTx env st tx =
-  -- TODO: Remove/rename TxValid & TxInvalid?
+  -- FIXME: TxValid is now not saying much and TxInvalid is unused now
   OnlyEffects $
     [ ClientEffect $ TxValid headId tx
     , NetworkEffect $ ReqTx party tx
@@ -641,6 +641,7 @@ onOpenNetworkReqTx env ledger st tx =
                     }
               }
         )
+        -- FIXME: should this be TxValid?
         [ClientEffect $ TxSeen headId tx]
         & emitSnapshot env
  where
@@ -1055,8 +1056,10 @@ update env ledger st ev = case (st, ev) of
     | otherwise ->
       onOpenNetworkReqTx env ledger openState tx
   (Open openState, NetworkEvent _ (ReqSn otherParty sn txs)) ->
+    -- FIXME: ttl == 0 not handled for ReqSn
     onOpenNetworkReqSn env ledger openState otherParty sn txs
   (Open openState, NetworkEvent _ (AckSn otherParty snapshotSignature sn)) ->
+    -- FIXME: ttl == 0 not handled for AckSn
     onOpenNetworkAckSn env openState otherParty snapshotSignature sn
   ( Open openState
     , OnChainEvent Observation{observedTx = OnCloseTx{snapshotNumber = closedSnapshotNumber, contestationDeadline}, newChainState}
