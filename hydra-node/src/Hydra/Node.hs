@@ -138,7 +138,7 @@ stepHydraNode tracer node = do
     -- TODO(SN): Handling of 'Left' is untested, i.e. the fact that it only
     -- does trace and not throw!
     Error _ -> return ()
-    Wait _reason -> putEventAfter eq waitDelay (decreaseTTL e)
+    Wait _reason _ -> putEventAfter eq waitDelay (decreaseTTL e)
     NewState s effs -> do
       save s
       forM_ effs (processEffect node tracer)
@@ -146,10 +146,12 @@ stepHydraNode tracer node = do
       forM_ effs (processEffect node tracer)
   traceWith tracer (EndEvent party e)
  where
+  -- FIXME: TTL is unused
   decreaseTTL =
     \case
-      -- FIXME: this yields in an arithUnderflow if ttl passes 0
-      NetworkEvent ttl msg -> NetworkEvent (ttl - 1) msg
+      NetworkEvent ttl msg
+        | ttl <= 0 -> NetworkEvent 0 msg -- FIXME: this is a huge smell
+        | otherwise -> NetworkEvent (ttl - 1) msg
       e -> e
 
   Environment{party} = env
@@ -174,7 +176,7 @@ processNextEvent HydraNode{nodeState, ledger, env} e =
       OnlyEffects effects -> (OnlyEffects effects, s)
       NewState s' effects -> (NewState s' effects, s')
       Error err -> (Error err, s)
-      Wait reason -> (Wait reason, s)
+      Wait reason s' -> (Wait reason s', s')
  where
   NodeState{modifyHeadState} = nodeState
 

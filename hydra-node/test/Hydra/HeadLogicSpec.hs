@@ -82,8 +82,8 @@ spec = do
         let reqTx = NetworkEvent defaultTTL $ ReqTx alice $ SimpleTx 2 inputs mempty
             inputs = utxoRef 1
             s0 = inOpenState threeParties ledger
-
-        update bobEnv ledger s0 reqTx `shouldBe` Wait (WaitOnNotApplicableTx (ValidationError "cannot apply transaction"))
+        -- TODO: this is expected to update allTxs in the coordinated state
+        update bobEnv ledger s0 reqTx `shouldBe` Wait (WaitOnNotApplicableTx (ValidationError "cannot apply transaction")) s0
 
       it "confirms snapshot given it receives AckSn from all parties" $ do
         let s0 = inOpenState threeParties ledger
@@ -139,13 +139,15 @@ spec = do
 
       it "waits if we receive a snapshot with not-yet-seen transactions" $ do
         let event = NetworkEvent defaultTTL $ ReqSn alice 1 [SimpleTx 1 (utxoRef 1) (utxoRef 2)]
-        update bobEnv ledger (inOpenState threeParties ledger) event
-          `shouldBe` Wait (WaitOnNotApplicableTx (ValidationError "cannot apply transaction"))
+            s = inOpenState threeParties ledger
+        update bobEnv ledger s event
+          `shouldBe` Wait (WaitOnNotApplicableTx (ValidationError "cannot apply transaction")) s
 
       it "waits if we receive an AckSn for an unseen snapshot" $ do
         let snapshot = Snapshot 1 mempty []
             event = NetworkEvent defaultTTL $ AckSn alice (sign aliceSk snapshot) 1
-        update bobEnv ledger (inOpenState threeParties ledger) event `shouldBe` Wait WaitOnSeenSnapshot
+            s = inOpenState threeParties ledger
+        update bobEnv ledger s event `shouldBe` Wait WaitOnSeenSnapshot s
 
       -- TODO: Write property tests for various future / old snapshot behavior.
       -- That way we could cover variations of snapshot numbers and state of
@@ -161,7 +163,7 @@ spec = do
             reqSn1 = NetworkEvent defaultTTL $ ReqSn alice 1 []
             reqSn2 = NetworkEvent defaultTTL $ ReqSn bob 2 []
         s1 <- assertNewState $ update bobEnv ledger s0 reqSn1
-        update bobEnv ledger s1 reqSn2 `shouldBe` Wait (WaitOnSnapshotNumber 1)
+        update bobEnv ledger s1 reqSn2 `shouldBe` Wait (WaitOnSnapshotNumber 1) s1
 
       it "acks signed snapshot from the constant leader" $ do
         let leader = alice
@@ -383,7 +385,14 @@ inOpenState ::
   Ledger SimpleTx ->
   HeadState SimpleTx
 inOpenState parties Ledger{initUTxO} =
-  inOpenState' parties $ CoordinatedHeadState u0 mempty snapshot0 NoSeenSnapshot
+  inOpenState' parties $
+    CoordinatedHeadState
+      { allTxs = mempty
+      , seenUTxO = u0
+      , seenTxs = mempty
+      , confirmedSnapshot = snapshot0
+      , seenSnapshot = NoSeenSnapshot
+      }
  where
   u0 = initUTxO
   snapshot0 = InitialSnapshot u0
@@ -458,7 +467,7 @@ assertNewState = \case
   NewState st _ -> pure st
   OnlyEffects effects -> failure $ "Unexpected 'OnlyEffects' outcome: " <> show effects
   Error e -> failure $ "Unexpected 'Error' outcome: " <> show e
-  Wait r -> failure $ "Unexpected 'Wait' outcome with reason: " <> show r
+  Wait r _ -> failure $ "Unexpected 'Wait' outcome with reason: " <> show r
 
 assertOnlyEffects ::
   (IsChainState tx) =>
@@ -468,7 +477,7 @@ assertOnlyEffects = \case
   NewState st _ -> failure $ "Unexpected 'NewState' outcome: " <> show st
   OnlyEffects _ -> pure ()
   Error e -> failure $ "Unexpected 'Error' outcome: " <> show e
-  Wait r -> failure $ "Unexpected 'Wait' outcome with reason: " <> show r
+  Wait r _ -> failure $ "Unexpected 'Wait' outcome with reason: " <> show r
 
 applyEvent ::
   (IsChainState tx) =>

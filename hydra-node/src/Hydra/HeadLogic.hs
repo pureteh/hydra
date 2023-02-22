@@ -15,7 +15,7 @@ module Hydra.HeadLogic where
 
 import Hydra.Prelude
 
-import Data.List (elemIndex)
+import Data.List (elemIndex, nub)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import GHC.Records (getField)
@@ -242,7 +242,9 @@ instance (IsTx tx, Arbitrary (ChainStateType tx)) => Arbitrary (OpenState tx) wh
 
 -- | Off-chain state of the Coordinated Head protocol.
 data CoordinatedHeadState tx = CoordinatedHeadState
-  { -- | The latest UTxO resulting from applying 'seenTxs' to
+  { -- | All transactions ever seen via ReqTx. Spec: T
+    allTxs :: [tx]
+  , -- | The latest UTxO resulting from applying 'seenTxs' to
     -- 'confirmedSnapshot'. Spec: L̂
     seenUTxO :: UTxOType tx
   , -- | List of seen transactions pending inclusion in a snapshot. Spec: T̂
@@ -364,7 +366,7 @@ deriving instance (FromJSON (Event tx), FromJSON (HeadState tx)) => FromJSON (Lo
 data Outcome tx
   = OnlyEffects {effects :: [Effect tx]}
   | NewState {headState :: HeadState tx, effects :: [Effect tx]}
-  | Wait {reason :: WaitReason}
+  | Wait {reason :: WaitReason, headState :: HeadState tx}
   | Error {error :: LogicError tx}
   deriving stock (Generic)
 
@@ -568,7 +570,13 @@ onInitialChainCollectTx st newChainState =
         OpenState
           { parameters
           , coordinatedHeadState =
-              CoordinatedHeadState u0 mempty initialSnapshot NoSeenSnapshot
+              CoordinatedHeadState
+                { allTxs = mempty
+                , seenUTxO = u0
+                , seenTxs = mempty
+                , confirmedSnapshot = initialSnapshot
+                , seenSnapshot = NoSeenSnapshot
+                }
           , previousRecoverableState = Initial st
           , chainState = newChainState
           , headId
@@ -616,23 +624,29 @@ onOpenClientNewTx env st tx =
 --
 -- __Transition__: 'OpenState' → 'OpenState'
 onOpenNetworkReqTx ::
+  Eq tx =>
   Environment ->
   Ledger tx ->
   OpenState tx ->
   -- | The transaction to be submitted to the head.
   tx ->
   Outcome tx
-onOpenNetworkReqTx env ledger st tx =
+onOpenNetworkReqTx env ledger st tx = do
+  let allTxs' = nub $ tx : allTxs
   -- Spec: wait L̂ ◦ tx ̸= ⊥ combined with L̂ ← L̂ ◦ tx
   case applyTransactions seenUTxO [tx] of
-    Left (_, err) -> Wait $ WaitOnNotApplicableTx err
+    Left (_, err) ->
+      -- TODO: do collect allTxs properly
+      -- TODO: not re-enqeue as we would pick from 'allTxs' on the next snapshot anyways?
+      Wait (WaitOnNotApplicableTx err) (Open st{coordinatedHeadState = coordinatedHeadState{allTxs = allTxs'}})
     Right utxo' ->
       NewState
         ( Open
             st
               { coordinatedHeadState =
                   coordinatedHeadState
-                    { seenTxs = seenTxs <> [tx]
+                    { allTxs = allTxs'
+                    , seenTxs = seenTxs <> [tx]
                     , -- FIXME: This is never reset otherwise. For example if
                       -- some other party was not up for some txs, but is up
                       -- again later and we would not agree with them on the
@@ -647,7 +661,7 @@ onOpenNetworkReqTx env ledger st tx =
  where
   Ledger{applyTransactions} = ledger
 
-  CoordinatedHeadState{seenTxs, seenUTxO} = coordinatedHeadState
+  CoordinatedHeadState{seenTxs, seenUTxO, allTxs} = coordinatedHeadState
 
   OpenState{coordinatedHeadState, headId} = st
 
@@ -723,14 +737,14 @@ onOpenNetworkReqSn env ledger st otherParty sn requestedTxs =
   waitNoSnapshotInFlight continue =
     if confSn == seenSn
       then continue
-      else Wait $ WaitOnSnapshotNumber seenSn
+      else Wait (WaitOnSnapshotNumber seenSn) (Open st)
 
   waitApplyTxs cont =
     case applyTransactions ledger confirmedUTxO requestedTxs of
       Left (_, err) ->
         -- FIXME: this will not happen, as we are always comparing against the
         -- confirmed snapshot utxo in NewTx?
-        Wait $ WaitOnNotApplicableTx err
+        Wait (WaitOnNotApplicableTx err) (Open st)
       Right u -> cont u
 
   pruneTransactions utxo = do
@@ -751,7 +765,7 @@ onOpenNetworkReqSn env ledger st otherParty sn requestedTxs =
     InitialSnapshot{initialUTxO} -> initialUTxO
     ConfirmedSnapshot{snapshot = Snapshot{utxo}} -> utxo
 
-  CoordinatedHeadState{confirmedSnapshot, seenSnapshot, seenTxs} = coordinatedHeadState
+  CoordinatedHeadState{confirmedSnapshot, seenSnapshot, seenUTxO, allTxs} = coordinatedHeadState
 
   OpenState{parameters, coordinatedHeadState} = st
 
@@ -827,7 +841,7 @@ onOpenNetworkAckSn env openState otherParty snapshotSignature sn =
     case seenSnapshot of
       SeenSnapshot snapshot sigs
         | seenSn == sn -> continue snapshot sigs
-      _ -> Wait WaitOnSeenSnapshot
+      _ -> Wait (WaitOnSeenSnapshot) (Open openState)
 
   requireNotSignedYet sigs continue =
     if not (Map.member otherParty sigs)
@@ -1050,11 +1064,8 @@ update env ledger st ev = case (st, ev) of
     onOpenClientClose openState
   (Open openState, ClientEvent (NewTx tx)) ->
     onOpenClientNewTx env openState tx
-  (Open openState@OpenState{headId}, NetworkEvent ttl (ReqTx _ tx))
-    | ttl == 0 ->
-      OnlyEffects [ClientEffect $ TxExpired headId tx]
-    | otherwise ->
-      onOpenNetworkReqTx env ledger openState tx
+  (Open openState, NetworkEvent _ (ReqTx _ tx)) ->
+    onOpenNetworkReqTx env ledger openState tx
   (Open openState, NetworkEvent _ (ReqSn otherParty sn txs)) ->
     -- FIXME: ttl == 0 not handled for ReqSn
     onOpenNetworkReqSn env ledger openState otherParty sn txs
