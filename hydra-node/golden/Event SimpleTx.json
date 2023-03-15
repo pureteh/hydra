@@ -1,26 +1,28 @@
 {
     "samples": [
         {
-            "clientInput": {
-                "tag": "Close"
+            "chainEvent": {
+                "contents": 3,
+                "tag": "Rollback"
             },
-            "tag": "ClientEvent"
+            "tag": "OnChainEvent"
         },
         {
             "chainEvent": {
-                "newChainState": {
-                    "slot": 5
-                },
-                "observedTx": {
-                    "tag": "OnFanoutTx"
-                },
-                "tag": "Observation"
+                "contents": 13,
+                "tag": "Rollback"
             },
             "tag": "OnChainEvent"
         },
         {
             "clientInput": {
-                "tag": "Contest"
+                "tag": "Commit",
+                "utxo": [
+                    -10,
+                    5,
+                    10,
+                    15
+                ]
             },
             "tag": "ClientEvent"
         },
@@ -29,66 +31,67 @@
                 "confirmedSnapshot": {
                     "signatures": {
                         "multiSignature": [
-                            "e54a9d28b5d06641b0f821c41a599cdd2e53b671a7fd6b8ba908ed3989ca8e2d0c6fcdd22aaa9094fcd57fd85f8f5950f2b3ef3ff2dfc097f2aaa46d4943c305",
-                            "9090b48836086c8920dd6a05629b71153ff97cb965358e535bbeda22455d7a1f493de27958d0eeef1e790d672c556c80fe6eec260422a1a1deb81318c604e205",
-                            "82c90cf3f8e01158bbfa44bb50580f0689979a0ee47805ea9268817e64d60a414964dd9f8b57dd041ed5c95ebfe1eba0a49e81e06ca46b6ae4ce80d6f496a502",
-                            "ec967c6737a855613f8db2cc142a87acfd015591a92fe6f39581ff40ae9997f9b582e246133594eb6594cfc09e97d8e368b85835fc579fbda24fda824ce2830d",
-                            "e8491ab150d557abd4d1d800f4f2d7d78bb0f824d6678c4f0e4b9c777bc8a51526e776c1d063a0857af51f968bd613a4b316f31738070f0f89ec27db94bdc403",
-                            "75520610d703b39c0b9ef512bc6b959ec550b2d1a0136546925f6a0fe1901e0a953be03acaf601b47753800068638bbf2ff907f8a3ee3c05354288e08a87d30a",
-                            "452408127edbde520b26d686289e1c63fbd53fb0513bf24759933e1f76f34c49ddd5542a055a0115f7fe10af0b0fe32d92049f7f55076e3593b308d636875b0b",
-                            "c830d9bb0ea03ce965a1a29d7d36c11ecf209253c2257fa3f0affc2b60bd6a71508f5a3e359fcc493c2d33216d57c5b16996acc83532b7e88c6319f13c799802",
-                            "67ecfe751c213725dbc61c1c3338bcdf8cdeb61362c16b1449aacf9cf045e129d1719352630eb2a6cae500e6a74330d6917f4e0d3db7bd607a969cc4f13a5502",
-                            "c830d9bb0ea03ce965a1a29d7d36c11ecf209253c2257fa3f0affc2b60bd6a71508f5a3e359fcc493c2d33216d57c5b16996acc83532b7e88c6319f13c799802",
-                            "afeaaa83db17f3cb8fb0d94e4a99b50d3bf02b13ca499d0853920a178bfcef0a1cb3a43bdebac7b5036b1029512f8b96c220a263ba69ce3b0da049e19a014606",
-                            "ec955f31aa45b2d47e3e8e684d42a3cfd104b35cd77b5c7d1ca4b9f80d2f4f1d182cfae5f8940004e19250a23f8c98b0d53fd668b2899b418e9fa16e0f8fc104",
-                            "19a354dde5fcef072ac0350fad2b38de2f252938463bc985909af942242adbb01b10c568819f98701799a208ae7acdd47dec8100c60c97fd39ba3fb83a5ee408",
-                            "50fd9457a3b9e92ad57d729aac444017cb5488d6d6afc0bee7e55854dad71923b9f0658735dffdd0d98484d173dc095c17ececb8077882b504795fb8bc437207",
-                            "28548c28e2e87fa296723abb7fff4fa645f3af15ebe1ba8eccd494e8dd9b8af81864b1ef8ec498a5a00c53434266a05f9f98a3592edba591e3e391c153f51202",
-                            "d52dcb663ad06796acf0a04c5020cac7d89449cf36d8077e799bca913b4bfe05f3f27bb24768fe286f40fb4d30625b1ac723fc5f51b68e095e4a209e6f976803",
-                            "b0078a9af73079f29e735f48cda37b200a2a180b5668e317472b7bbfedd2ec8b2ec937b0ee20d6636980bfc620e05c6bbb5fe56416d0222419dd001699877c04",
-                            "ae0f9218c165450b72d8441959d0c2d8141f78d4ebec645f3be302b34e94cda9d98c878f8b40558b8e1e83fffcfc58f38bd6f63f0bd0480152673a5f11ba0108",
-                            "481a929e010717465c88ada0d1f3b891a7ddf4a3d5ed33f3cb8a6bfa403153ba904959892138d2b6658a0898ca45903016364f4039ee60004cea27974913ea03",
-                            "9a629dd65694c7c3cc154ca5b008829904efba8888e8ef96736bf45e57357a16831bc9d2c1f4af2172a73609f89aa8a18f728aa2f8a61336fd719b1fafdc4e0b",
-                            "e88e0aa127c89630680e4bde56ed5c699394201a48890fe7be9377e44169bf7fb9d4b7e739023abbc85a6f2d2ce534c19b2793184c0f2f4458a1afb4e696b00e"
+                            "50f61fa033ce07495a9ddf7faa9e16c75849121f1790b8722c32c346d0f29830c06e8abaed52b3607d8b4c203252a2cd066753b698d9944e57219c93fadc980b",
+                            "e5db53e34b842eb77c00b832a44527437a56fc6ddf1a62a956278c1bfa7b236590fe17b3bbed0a78281b6cd5c80974a71ad3a98772b9f7fe956b004dbca11408",
+                            "da33336fa346494ea3747807fe76f055375b634c9988f3dc3a6c6fe965f630f791c4cf87502f0067ba60ec4f97b030d9d64b57c531aa860eb19eea5e35dfaf01",
+                            "226234bf118f0042a12cd7f4926d5dc07391d6f375c52e5d21f8653b87fe3dfb9a94e4a117336ac539cdd2130cefa3c6912649722555c0df006c0f4ba11f6a06",
+                            "453b33b179f64ee6a9162d4a7c88fcf01e09c2a8b7f256ed320317bca79a8c6e911c6c5ca40e8fc524e4a280f6bd9472b66a533788cbecc061fffc467ed28106",
+                            "1b639d52f26e88fcd50ae90f63fd248364c663a680fb9654eb7d275a6d183b527ba9346a9c664198cd971f48c6b155fcea7c8033e74e47b16f854f193c1dab0f",
+                            "439a37e422f77fc075ef6b0c47b42f56311a194fcdb7030a3e100eb2f4844f9bb86bdbf88c0a2aec0f9385ed09b73207b61ee6b2037ead60b92fde4f61e2e40c",
+                            "6517ee5851feb9446e806d698afe1f9f9e807058a89affc9167b51484078e1aa3d6220a3436deb99ff257e0419752db452e57f57fe6d3865730293c9ccb2c304",
+                            "f2df89217abe15e7005e58ec419cf530e7972f27f274eac2d838868cdc31c7b701513bb106e74cf200c6e1923485fab1fa728f5c168321e9e60983f950babd08",
+                            "1cab1e4cb4c4b604405e813766c30fd1e4f9596dabfb422b3233775f5eabe5be83005d6d0df926578373f85bae6a786d1f61eed89457c2c8383c18e2f55ec601",
+                            "e835d63d3d544dba0a041f4c412c235ae95868932995508fe2a1a0e60e78f36e9c5d0eb08d90625621bbbca0408988d5151c68db6e88d2086854c333e48a150a",
+                            "cd3d450b0df9e27714ad46e31a4788df5dbd1d8e3d8d699eca0e2bc6d2c89ac54c3101d324f482f561e7b7a2191465227f492c1713eb9a8b36437d43e34d6906",
+                            "c90e22c7cc691658af154ef246d68bfd5aa3336443339c94201a6f959e2e2b7483f7c090fc3d0bb06078a62f1f289616c75a0a01b7f730cfdcb2237f7ce02c08",
+                            "3cf5a9be56f4994fd11b05e268c511d3a424530a4007cdc8ee66891d0b4c8f4481d8afc1665f0035cfd2a9738133e3c3ed7795d64a36916aaa72d4395f904000",
+                            "06a10458a69cf9faefbefdb4c13953055ee3f8e00c39207959c4e7f00daf96b3285c60fba3b4439d0b69a9c1e3971f44f9c24535820cb2f07209f21d99dcbf03",
+                            "3d46a513e5aae13a90170320bf93ec215cc2a6c17f26914accd138ed804d8039cdb12813f0ee5db72c79770c03a5b527552a521f06ba3db2aa636d6d5afcc30b",
+                            "181053c251da85787c33f30fc6d16226ec1bfdeec04366b90d27a8cb7259110e7140abe47ab15cca26e4d6959bae7402c7e7f6b2b44a793b101a4d24f6a39309",
+                            "6038c5498b52c7f98096f4c351e318fece7d5295f182690cbab1f75a0ac6a95bc4ab4493b50d5246522450e084cfaf8ae253b7196a3c33c1232053c1ab56300b",
+                            "10337d20a819d84551e806d6aad3c691a2045829578189e813485098d9f7d45c05d9795af349e890905a5390cbe9ef9b10b56a94f8081d8769ac953a7903a801",
+                            "6f09d06ba0c94a94f5d38214df5d75b95b82328aed52d1673a9a6b58a14e61cf4d7dcd646e9c041f02552c5d71b6b9216e3c8abd53efff56d01517bba1149209",
+                            "1c9d0faac86cedc2b7e517b1eabc88f8d516b027689ac1721a1c54f6db314f807d280ddc3ae45b39d1df3f0824e5aa3528763ee1741925b361870eb0c9685b0b",
+                            "e8d7024544f76ab8837ac6ac8122cd407db9b19825389be7d0067290e912c51b3b62282cf2ff020fca264c73fb2e3bf90207707afaebe8f07fe6d747b8f9e606",
+                            "6efdf5a039de5831f0744b49fe605f258e2107e5e249a69bd14fb18db9c28e468064e9fd9a9f80363c815b4420e85bff8fca1b95ba76c09af5444800cc12c508",
+                            "0e5a4062661dc240b35963bcfdb8599b8e4d428a90883ca4672d6e80cac44c46f151b07202bba908bbc911a237bae81450f51e70831ab729531045cbc9ce1c0d",
+                            "d9da440ced46f346f3ae766e0e96accdd35dd89a247153cf83feb8ba967b8f66c7642c15644df24d262cdb88c4676bea789248085f95eaff9c6f533472937509",
+                            "8e41dd6742116a1a4ce337bee55824d690b9f1524b5b99870d7e52931b2cd0525c2229235557698869b42d0cbeb348b6d95f0b456f3447336b65045a224f100e",
+                            "9babc8588a0dc21bd4fde778d16f6b5edd168dceb65f2b3f8b65bc9771472d9ba8b1ed65594b56898fac03fe4c65be35a78484f84d0362b6c8d908e1ab4b520b",
+                            "c3899033e6e3fe6a051855dd6e0cf829d4f536ddff6714c31c25a08dd93b894cd9038cb915ff6555f818b8f59227953e0d25fd104a5c38666acfbeb05aadf201"
                         ]
                     },
                     "snapshot": {
                         "confirmedTransactions": [],
-                        "snapshotNumber": 13,
+                        "snapshotNumber": 27,
                         "utxo": [
-                            -24,
-                            -20,
-                            -10,
+                            -30,
                             -9,
-                            -2,
+                            -5,
                             -1,
-                            4,
-                            5,
-                            11,
+                            0,
+                            2,
                             16,
-                            18,
-                            21,
-                            22,
-                            23,
-                            26,
-                            27
+                            22
                         ]
                     },
                     "tag": "ConfirmedSnapshot"
                 },
-                "tag": "ContestTx"
+                "tag": "CloseTx"
             },
             "postTxError": {
-                "tag": "MoreThanOneUTxOCommitted"
+                "mainnetLimitLovelace": 68,
+                "tag": "CommittedTooMuchADAForMainnet",
+                "userCommittedLovelace": 159
             },
             "tag": "PostTxError"
         },
         {
             "clientInput": {
-                "tag": "Contest"
+                "tag": "GetUTxO"
             },
             "tag": "ClientEvent"
         }
     ],
-    "seed": -1629886451
+    "seed": -659892713
 }
