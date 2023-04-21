@@ -16,7 +16,7 @@ import Cardano.Ledger.Crypto (StandardCrypto)
 import Cardano.Ledger.Era (SupportsSegWit (fromTxSeq))
 import qualified Cardano.Ledger.Shelley.API as Ledger
 import Cardano.Slotting.Slot (SlotNo (..))
-import Control.Monad.Class.MonadSTM (throwSTM)
+import Control.Monad.Class.MonadSTM (throwSTM, newEmptyTMVar, MonadSTM (putTMVar, readTMVar, swapTMVar))
 import Data.Sequence.Strict (StrictSeq)
 import Hydra.Cardano.Api (
   ChainPoint (..),
@@ -202,7 +202,7 @@ chainSyncHandler tracer callback getTimeHandle ctx =
   onRollBackward rollbackPoint = do
     let point = fromConsensusPointInMode CardanoMode rollbackPoint
     traceWith tracer $ RolledBackward{point}
-    callback (const . Just $ Rollback $ chainSlotFromPoint point)
+    callback (const . pure . Just $ Rollback $ chainSlotFromPoint point)
 
   onRollForward :: Block -> m ()
   onRollForward blk = do
@@ -222,14 +222,22 @@ chainSyncHandler tracer callback getTimeHandle ctx =
           Left reason ->
             throwIO TimeConversionException{slotNo, reason}
           Right utcTime ->
-            callback (const . Just $ Tick utcTime)
+            callback (const . pure . Just $ Tick utcTime)
 
-    forM_ receivedTxs $ \tx ->
-      callback $ \ChainStateAt{chainState = cs} ->
+
+    tmv <- atomically newEmptyTMVar
+    callback $ \ChainStateAt{chainState} -> do
+      atomically $ putTMVar tmv chainState
+      pure Nothing
+
+    forM_ receivedTxs $ \tx -> do
+      callback $ \_chainState -> do -- NOTE: deliberately ignoring chain state
+        cs <- atomically $ readTMVar tmv
         case observeSomeTx ctx cs tx of
-          Nothing -> Nothing
-          Just (observedTx, cs') ->
-            Just $
+          Nothing -> pure Nothing
+          Just (observedTx, cs') -> do
+            void . atomically $ swapTMVar tmv cs'
+            pure . Just $
               Observation
                 { observedTx
                 , newChainState =

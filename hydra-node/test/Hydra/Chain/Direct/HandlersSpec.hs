@@ -130,7 +130,7 @@ spec = do
     timeHandle <- pickBlind arbitrary
     let callback cont =
           -- Give chain state in which we expect the 'tx' to yield an 'Observation'.
-          case cont chainState of
+          cont chainState >>= \case
             Nothing ->
               -- XXX: We need this to debug as 'failure' (via 'run') does not
               -- yield counter examples.
@@ -159,7 +159,7 @@ spec = do
     rolledBackTo <- run newEmptyTMVarIO
     let callback cont = do
           cs <- readTVarIO stateVar
-          case cont cs of
+          cont cs >>= \case
             Nothing -> do
               failure "expected continuation to yield observation"
             Just Tick{} -> pure ()
@@ -196,7 +196,7 @@ recordEventsHandler ctx cs getTimeHandle = do
 
   recordEvents :: TVar IO [ChainEvent Tx] -> ChainCallback Tx IO
   recordEvents var cont = do
-    case cont cs of
+    cont cs >>= \case
       Nothing -> pure ()
       Just e -> atomically $ modifyTVar var (e :)
 
