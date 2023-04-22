@@ -131,7 +131,7 @@ spec = do
     let callback cont =
           -- Give chain state in which we expect the 'tx' to yield an 'Observation'.
           case cont chainState of
-            Nothing ->
+            [] ->
               -- XXX: We need this to debug as 'failure' (via 'run') does not
               -- yield counter examples.
               failure . toString $
@@ -140,11 +140,11 @@ spec = do
                   , "transition: " <> show transition
                   , "chainState: " <> show st
                   ]
-            Just Rollback{} ->
-              failure "rolled back but expected roll forward."
-            Just Tick{} -> pure ()
-            Just Observation{observedTx} ->
+            [Rollback{}] -> failure "rolled back but expected roll forward."
+            [Tick{}] -> pure ()
+            [Observation{observedTx}] ->
               fst <$> observeSomeTx ctx st tx `shouldBe` Just observedTx
+            (_ : _) -> failure "expected a single event only"
 
     let handler = chainSyncHandler nullTracer callback (pure timeHandle) ctx
     run $ onRollForward handler blk
@@ -160,11 +160,11 @@ spec = do
     let callback cont = do
           cs <- readTVarIO stateVar
           case cont cs of
-            Nothing -> do
-              failure "expected continuation to yield observation"
-            Just Tick{} -> pure ()
-            Just (Rollback slot) -> atomically $ putTMVar rolledBackTo slot
-            Just Observation{newChainState} -> atomically $ writeTVar stateVar newChainState
+            [] -> do failure "expected continuation to yield observation"
+            [Tick{}] -> pure ()
+            [Rollback slot] -> atomically $ putTMVar rolledBackTo slot
+            [Observation{newChainState}] -> atomically $ writeTVar stateVar newChainState
+            (_ : _) -> failure "expected a single event only"
 
     let handler =
           chainSyncHandler
@@ -197,8 +197,9 @@ recordEventsHandler ctx cs getTimeHandle = do
   recordEvents :: TVar IO [ChainEvent Tx] -> ChainCallback Tx IO
   recordEvents var cont = do
     case cont cs of
-      Nothing -> pure ()
-      Just e -> atomically $ modifyTVar var (e :)
+      [] -> pure ()
+      [e] -> atomically $ modifyTVar var (e :)
+      (_ : _) -> failure "multiple events to record!?"
 
 withCounterExample :: [Block] -> TVar IO ChainStateAt -> IO a -> PropertyM IO a
 withCounterExample blks headState step = do

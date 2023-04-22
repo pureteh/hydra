@@ -38,7 +38,7 @@ import Control.Monad.Class.MonadSTM (
  )
 import Hydra.API.Server (Server, sendOutput)
 import Hydra.Cardano.Api (AsType (AsSigningKey, AsVerificationKey))
-import Hydra.Chain (Chain (..), ChainCallback, ChainEvent (..), ChainStateType, IsChainState, PostTxError)
+import Hydra.Chain (Chain (..), ChainCallback, ChainStateType, IsChainState, PostTxError)
 import Hydra.Chain.Direct.Util (readFileTextEnvelopeThrow)
 import Hydra.Crypto (AsType (AsHydraKey))
 import Hydra.HeadLogic (
@@ -49,7 +49,6 @@ import Hydra.HeadLogic (
   Outcome (..),
   defaultTTL,
   getChainState,
-  setChainState,
  )
 import qualified Hydra.HeadLogic as Logic
 import Hydra.Ledger (IsTx, Ledger)
@@ -266,19 +265,11 @@ chainCallback ::
   NodeState tx m ->
   EventQueue m (Event tx) ->
   ChainCallback tx m
-chainCallback NodeState{modifyHeadState} eq cont = do
-  -- Provide chain state to continuation and update it when we get a newState
-  -- NOTE: Although we do handle the chain state explictly in the 'HeadLogic',
-  -- this is required as multiple transactions may be observed and the chain
-  -- state shall accumulate the state changes coming with those observations.
-  mEvent <- atomically . modifyHeadState $ \hs ->
-    case cont $ getChainState hs of
-      Nothing ->
-        (Nothing, hs)
-      Just ev@Observation{newChainState} ->
-        (Just ev, setChainState newChainState hs)
-      Just ev ->
-        (Just ev, hs)
-  case mEvent of
-    Nothing -> pure ()
-    Just chainEvent -> putEvent eq $ OnChainEvent{chainEvent}
+chainCallback NodeState{queryHeadState} eq cont = do
+  -- NOTE: Important to only provide the current chain state to the chain layer,
+  -- but not update it here. While the chain layer should make sure it can
+  -- observe multiple transactions in a black (on callback), the head logic will
+  -- update the recorded chain state when processing the events.
+  hs <- atomically queryHeadState
+  let events = cont (getChainState hs)
+  for_ events $ \chainEvent -> putEvent eq OnChainEvent{chainEvent}

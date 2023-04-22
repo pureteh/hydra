@@ -202,7 +202,7 @@ chainSyncHandler tracer callback getTimeHandle ctx =
   onRollBackward rollbackPoint = do
     let point = fromConsensusPointInMode CardanoMode rollbackPoint
     traceWith tracer $ RolledBackward{point}
-    callback (const . Just $ Rollback $ chainSlotFromPoint point)
+    callback (const [Rollback $ chainSlotFromPoint point])
 
   onRollForward :: Block -> m ()
   onRollForward blk = do
@@ -222,22 +222,25 @@ chainSyncHandler tracer callback getTimeHandle ctx =
           Left reason ->
             throwIO TimeConversionException{slotNo, reason}
           Right utcTime ->
-            callback (const . Just $ Tick utcTime)
+            callback (const [Tick utcTime])
 
-    forM_ receivedTxs $ \tx ->
-      callback $ \ChainStateAt{chainState = cs} ->
-        case observeSomeTx ctx cs tx of
-          Nothing -> Nothing
-          Just (observedTx, cs') ->
-            Just $
-              Observation
-                { observedTx
-                , newChainState =
-                    ChainStateAt
-                      { chainState = cs'
-                      , recordedAt = Just point
-                      }
-                }
+    callback $ \ChainStateAt{chainState} ->
+      catMaybes . flip evalState chainState $
+        forM receivedTxs $ \tx -> do
+          cs <- get
+          case observeSomeTx ctx cs tx of
+            Nothing -> pure Nothing
+            Just (observedTx, cs') -> do
+              put cs'
+              pure . Just $
+                Observation
+                  { observedTx
+                  , newChainState =
+                      ChainStateAt
+                        { chainState = cs'
+                        , recordedAt = Just point
+                        }
+                  }
 
 prepareTxToPost ::
   (MonadSTM m, MonadThrow (STM m)) =>
