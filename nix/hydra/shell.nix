@@ -16,6 +16,9 @@ let
 
   cabal = pkgs.haskell-nix.cabal-install.${compiler};
 
+  # XXX: Uses a newer ghc just for fourmolu as it requires GHC2021
+  fourmolu = pkgs.haskell-nix.tool "ghc927" "fourmolu" "0.12.0.0";
+
   haskell-language-server = pkgs.haskell-nix.tool compiler "haskell-language-server" rec {
     src = pkgs.haskell-nix.sources."hls-1.10";
     cabalProject = builtins.readFile (src + "/cabal.project");
@@ -49,7 +52,7 @@ let
 
   devInputs = if withoutDevTools then [ ] else [
     # Automagically format .hs and .cabal files
-    pkgs.haskellPackages.fourmolu
+    fourmolu
     pkgs.haskellPackages.cabal-fmt
     # Essenetial for a good IDE
     haskell-language-server
