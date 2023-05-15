@@ -8,9 +8,11 @@ import Hydra.Cardano.Api
 import Hydra.Prelude
 
 import qualified Cardano.Ledger.BaseTypes as Ledger
+import qualified Cardano.Ledger.Crypto as Ledger
+import Cardano.Ledger.Shelley.Genesis (fromNominalDiffTimeMicro)
 import qualified Cardano.Ledger.Shelley.Genesis as Ledger
 import qualified Cardano.Ledger.Shelley.LedgerState as Ledger
-import qualified Cardano.Ledger.Shelley.Rules.Ledger as Ledger
+import qualified Cardano.Ledger.Shelley.Rules as Ledger
 import Cardano.Slotting.EpochInfo (hoistEpochInfo)
 import Cardano.Slotting.Time (mkSlotLength)
 import Control.Arrow (left)
@@ -29,14 +31,14 @@ readJsonFileThrow parser filepath = do
     Right a -> pure a
 -- * Globals
 
-shelleyGenesisFromJson :: Json.Value -> Json.Parser (Ledger.ShelleyGenesis LedgerEra)
+shelleyGenesisFromJson :: Json.Value -> Json.Parser (Ledger.ShelleyGenesis Ledger.StandardCrypto)
 shelleyGenesisFromJson = parseJSON
 
 -- FIXME: We should not need the shelley genesis as the Ledger.Globals are
 -- irrelevant (e.g. active slot coefficient) or can be derived from chain config
 -- (e.g. networkId). Consequence of this would be less configuration for the
 -- hydra-node (only protocol-parameters).
-newGlobals :: Ledger.ShelleyGenesis LedgerEra -> Ledger.Globals
+newGlobals :: Ledger.ShelleyGenesis Ledger.StandardCrypto -> Ledger.Globals
 newGlobals shelleyGenesis =
   Ledger.mkShelleyGlobals
     shelleyGenesis
@@ -45,13 +47,14 @@ newGlobals shelleyGenesis =
  where
   -- NOTE: This is used by the ledger to discard blocks that have a version
   -- beyond a known limit. Or said differently, unused and irrelevant for Hydra.
-  maxProtocolVersion = 0
+  maxProtocolVersion = maxBound
   epochInfo =
     Consensus.neverForksSummary epochSize slotLength
       & Consensus.summaryToEpochInfo
       & hoistEpochInfo (left show . runExcept)
   epochSize = Ledger.sgEpochLength shelleyGenesis
-  slotLength = mkSlotLength (Ledger.sgSlotLength shelleyGenesis)
+  slotLength = mkSlotLength . fromNominalDiffTimeMicro $ Ledger.sgSlotLength shelleyGenesis
+
 -- * LedgerEnv
 
 protocolParametersFromJson :: Json.Value -> Json.Parser ProtocolParameters

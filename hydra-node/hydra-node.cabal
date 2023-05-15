@@ -124,12 +124,14 @@ library
     , bytestring
     , cardano-binary
     , cardano-crypto-class
+    , cardano-ledger-allegra
     , cardano-ledger-alonzo
     , cardano-ledger-alonzo-test
     , cardano-ledger-babbage
     , cardano-ledger-babbage-test
     , cardano-ledger-byron
     , cardano-ledger-core
+    , cardano-ledger-mary
     , cardano-ledger-shelley
     , cardano-prelude
     , cardano-slotting
