@@ -131,7 +131,6 @@ library
     , cardano-ledger-byron
     , cardano-ledger-core
     , cardano-ledger-shelley
-    , cardano-ledger-shelley-ma
     , cardano-prelude
     , cardano-slotting
     , cardano-strict-containers
@@ -302,8 +301,6 @@ test-suite tests
     , cardano-ledger-babbage
     , cardano-ledger-core
     , cardano-ledger-shelley
-    , cardano-ledger-shelley-ma
-    , cardano-ledger-shelley-ma-test
     , cardano-slotting
     , cardano-strict-containers
     , cborg

@@ -215,14 +215,13 @@ test-suite integration
   build-depends:
     , aeson
     , async
-    , base                       >=4.7 && <5
+    , base                    >=4.7 && <5
     , base16-bytestring
     , bytestring
     , cardano-crypto-class
     , cardano-ledger-alonzo
     , cardano-ledger-core
     , cardano-ledger-shelley
-    , cardano-ledger-shelley-ma
     , containers
     , directory
     , filepath
