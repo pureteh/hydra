@@ -20,6 +20,10 @@ changes.
     - Added current chain slot in OpenState.
     - Added current chain slot and time in chain Tick.
 
+- **BREAKING** Changes to `hydra-cardano-api`:
+
+  - Drop `UsingRawBytesHex` as it is available upstream in `cardano-api` now.
+
 ## [0.10.0] - 2023-05-11
 
 This release contains several breaking changes and you'll need to apply the
