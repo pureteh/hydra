@@ -28,14 +28,34 @@ module Hydra.Network (
 
 import Hydra.Prelude hiding (show)
 
-import Cardano.Ledger.Shelley.Orphans ()
-import Data.IP (IP, toIPv4w)
+import Data.Aeson (withText)
+import Data.IP (IP, IPv4, IPv6, toIPv4w)
 import Data.Text (pack, unpack)
 import Network.Socket (PortNumber, close)
 import Network.TypedProtocol.Pipelined ()
 import Test.QuickCheck (elements, listOf, suchThat)
 import Text.Read (Read (readsPrec))
 import Text.Show (Show (show))
+
+-- * Orphan instances
+
+instance FromJSON IPv4 where
+  parseJSON =
+    withText "IPv4" $ \txt -> case readEither (toString txt) of
+      Right ipv4 -> return ipv4
+      Left _ -> fail $ "failed to read as IPv4 " ++ show txt
+
+instance ToJSON IPv4 where
+  toJSON = toJSON . show
+
+instance FromJSON IPv6 where
+  parseJSON =
+    withText "IPv6" $ \txt -> case readEither (toString txt) of
+      Right ipv6 -> return ipv6
+      Left _ -> fail $ "failed to read as IPv6 " ++ show txt
+
+instance ToJSON IPv6 where
+  toJSON = toJSON . show
 
 deriving instance ToJSON IP
 deriving instance FromJSON IP
