@@ -13,8 +13,6 @@ import qualified Data.Set as Set
 import Ouroboros.Consensus.HardFork.Combinator.AcrossEras (EraMismatch)
 import Test.QuickCheck (oneof)
 
-type NodeSocket = FilePath
-
 data QueryException
   = QueryAcquireException AcquiringFailure
   | QueryEraMismatchException EraMismatch
@@ -40,7 +38,7 @@ data CardanoClient = CardanoClient
   }
 
 -- | Construct a 'CardanoClient' handle.
-mkCardanoClient :: NetworkId -> NodeSocket -> CardanoClient
+mkCardanoClient :: NetworkId -> SocketPath -> CardanoClient
 mkCardanoClient networkId nodeSocket =
   CardanoClient
     { queryUTxOByAddress = queryUTxO networkId nodeSocket QueryTip
@@ -58,7 +56,7 @@ buildTransaction ::
   -- | Current network identifier
   NetworkId ->
   -- | Filepath to the cardano-node's domain socket
-  FilePath ->
+  SocketPath ->
   -- | Change address to send
   AddressInEra ->
   -- | Unspent transaction outputs to spend.
@@ -80,6 +78,7 @@ buildTransaction networkId socket changeAddress utxoToSpend collateral outs = do
         (toLedgerEpochInfo eraHistory)
         pparams
         stakePools
+        mempty
         (UTxO.toApi utxoToSpend)
         (bodyContent pparams)
         changeAddress
@@ -115,7 +114,7 @@ submitTransaction ::
   -- | Current network discriminant
   NetworkId ->
   -- | Filepath to the cardano-node's domain socket
-  FilePath ->
+  SocketPath ->
   -- | A signed transaction.
   Tx ->
   IO ()
@@ -154,7 +153,7 @@ awaitTransaction ::
   -- | Current network discriminant
   NetworkId ->
   -- | Filepath to the cardano-node's domain socket
-  FilePath ->
+  SocketPath ->
   -- | The transaction to watch / await
   Tx ->
   IO UTxO
@@ -186,12 +185,12 @@ instance Arbitrary QueryPoint where
       ]
 
 -- | Query the latest chain point aka "the tip".
-queryTip :: NetworkId -> FilePath -> IO ChainPoint
+queryTip :: NetworkId -> SocketPath -> IO ChainPoint
 queryTip networkId socket =
   chainTipToChainPoint <$> getLocalChainTip (localNodeConnectInfo networkId socket)
 
 -- | Query the latest chain point just for the slot number.
-queryTipSlotNo :: NetworkId -> FilePath -> IO SlotNo
+queryTipSlotNo :: NetworkId -> SocketPath -> IO SlotNo
 queryTipSlotNo networkId socket =
   getLocalChainTip (localNodeConnectInfo networkId socket) >>= \case
     ChainTipAtGenesis -> pure 0
@@ -200,21 +199,21 @@ queryTipSlotNo networkId socket =
 -- | Query the system start parameter at given point.
 --
 -- Throws at least 'QueryException' if query fails.
-querySystemStart :: NetworkId -> FilePath -> QueryPoint -> IO SystemStart
+querySystemStart :: NetworkId -> SocketPath -> QueryPoint -> IO SystemStart
 querySystemStart networkId socket queryPoint =
   runQuery networkId socket queryPoint QuerySystemStart
 
 -- | Query the era history at given point.
 --
 -- Throws at least 'QueryException' if query fails.
-queryEraHistory :: NetworkId -> FilePath -> QueryPoint -> IO (EraHistory CardanoMode)
+queryEraHistory :: NetworkId -> SocketPath -> QueryPoint -> IO (EraHistory CardanoMode)
 queryEraHistory networkId socket queryPoint =
   runQuery networkId socket queryPoint $ QueryEraHistory CardanoModeIsMultiEra
 
 -- | Query the protocol parameters at given point.
 --
 -- Throws at least 'QueryException' if query fails.
-queryProtocolParameters :: NetworkId -> FilePath -> QueryPoint -> IO ProtocolParameters
+queryProtocolParameters :: NetworkId -> SocketPath -> QueryPoint -> IO ProtocolParameters
 queryProtocolParameters networkId socket queryPoint =
   let query =
         QueryInEra
@@ -228,7 +227,7 @@ queryProtocolParameters networkId socket queryPoint =
 -- | Query 'GenesisParameters' at a given point.
 --
 -- Throws at least 'QueryException' if query fails.
-queryGenesisParameters :: NetworkId -> FilePath -> QueryPoint -> IO GenesisParameters
+queryGenesisParameters :: NetworkId -> SocketPath -> QueryPoint -> IO GenesisParameters
 queryGenesisParameters networkId socket queryPoint =
   let query =
         QueryInEra
@@ -242,7 +241,7 @@ queryGenesisParameters networkId socket queryPoint =
 -- | Query UTxO for all given addresses at given point.
 --
 -- Throws at least 'QueryException' if query fails.
-queryUTxO :: NetworkId -> FilePath -> QueryPoint -> [Address ShelleyAddr] -> IO UTxO
+queryUTxO :: NetworkId -> SocketPath -> QueryPoint -> [Address ShelleyAddr] -> IO UTxO
 queryUTxO networkId socket queryPoint addresses =
   let query =
         QueryInEra
@@ -258,7 +257,7 @@ queryUTxO networkId socket queryPoint addresses =
 -- | Query UTxO for given tx inputs at given point.
 --
 -- Throws at least 'QueryException' if query fails.
-queryUTxOByTxIn :: NetworkId -> FilePath -> QueryPoint -> [TxIn] -> IO UTxO
+queryUTxOByTxIn :: NetworkId -> SocketPath -> QueryPoint -> [TxIn] -> IO UTxO
 queryUTxOByTxIn networkId socket queryPoint inputs =
   let query =
         QueryInEra
@@ -273,7 +272,7 @@ queryUTxOByTxIn networkId socket queryPoint inputs =
 -- should obviously not be used in production code.
 --
 -- Throws at least 'QueryException' if query fails.
-queryUTxOWhole :: NetworkId -> FilePath -> QueryPoint -> IO UTxO
+queryUTxOWhole :: NetworkId -> SocketPath -> QueryPoint -> IO UTxO
 queryUTxOWhole networkId socket queryPoint = do
   UTxO.fromApi <$> (runQuery networkId socket queryPoint query >>= throwOnEraMismatch)
  where
@@ -288,7 +287,7 @@ queryUTxOWhole networkId socket queryPoint = do
 -- | Query UTxO for the address of given verification key at point.
 --
 -- Throws at least 'QueryException' if query fails.
-queryUTxOFor :: NetworkId -> FilePath -> QueryPoint -> VerificationKey PaymentKey -> IO UTxO
+queryUTxOFor :: NetworkId -> SocketPath -> QueryPoint -> VerificationKey PaymentKey -> IO UTxO
 queryUTxOFor networkId nodeSocket queryPoint vk =
   case mkVkAddress networkId vk of
     ShelleyAddressInEra addr ->
@@ -299,7 +298,7 @@ queryUTxOFor networkId nodeSocket queryPoint vk =
 -- | Query the current set of registered stake pools.
 --
 -- Throws at least 'QueryException' if query fails.
-queryStakePools :: NetworkId -> FilePath -> QueryPoint -> IO (Set PoolId)
+queryStakePools :: NetworkId -> SocketPath -> QueryPoint -> IO (Set PoolId)
 queryStakePools networkId socket queryPoint =
   let query =
         QueryInEra
@@ -311,7 +310,7 @@ queryStakePools networkId socket queryPoint =
    in runQuery networkId socket queryPoint query >>= throwOnEraMismatch
 
 -- | Throws at least 'QueryException' if query fails.
-runQuery :: NetworkId -> FilePath -> QueryPoint -> QueryInMode CardanoMode a -> IO a
+runQuery :: NetworkId -> SocketPath -> QueryPoint -> QueryInMode CardanoMode a -> IO a
 runQuery networkId socket point query =
   queryNodeLocalState (localNodeConnectInfo networkId socket) maybePoint query >>= \case
     Left err -> throwIO $ QueryAcquireException err
@@ -330,7 +329,7 @@ throwOnEraMismatch res =
     Left eraMismatch -> throwIO $ QueryEraMismatchException eraMismatch
     Right result -> pure result
 
-localNodeConnectInfo :: NetworkId -> FilePath -> LocalNodeConnectInfo CardanoMode
+localNodeConnectInfo :: NetworkId -> SocketPath -> LocalNodeConnectInfo CardanoMode
 localNodeConnectInfo = LocalNodeConnectInfo cardanoModeParams
 
 cardanoModeParams :: ConsensusModeParams CardanoMode
