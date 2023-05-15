@@ -23,16 +23,17 @@ readKeyPair keyPath = do
   sk <- readFileTextEnvelopeThrow (AsSigningKey AsPaymentKey) keyPath
   pure (getVerificationKey sk, sk)
 
+readVerificationKey :: FilePath -> IO (Shelley.VerificationKey PaymentKey)
+readVerificationKey = readFileTextEnvelopeThrow (AsVerificationKey AsPaymentKey)
+
+-- XXX: Should use 'File' from cardano-api
 readFileTextEnvelopeThrow ::
   HasTextEnvelope a =>
   AsType a ->
   FilePath ->
   IO a
 readFileTextEnvelopeThrow asType =
-  either (fail . show) pure <=< readFileTextEnvelope asType
-
-readVerificationKey :: FilePath -> IO (Shelley.VerificationKey PaymentKey)
-readVerificationKey = readFileTextEnvelopeThrow (Shelley.AsVerificationKey Shelley.AsPaymentKey)
+  either (fail . show) pure <=< readFileTextEnvelope asType . File
 
 -- | A simple retrying function with a constant delay. Retries only if the given
 -- predicate evaluates to 'True'.
