@@ -124,18 +124,21 @@ pparams :: ProtocolParameters
 pparams =
   (fromLedgerPParams (shelleyBasedEra @Era) def)
     { protocolParamCostModels =
-        fromAlonzoCostModels
-          . CostModels
-          $ Map.fromList
-            [ (PlutusV1, testCostModel PlutusV1)
-            , (PlutusV2, testCostModel PlutusV2)
-            ]
+        fromAlonzoCostModels $
+          CostModels
+            ( Map.fromList
+                [ (PlutusV1, testCostModel PlutusV1)
+                , (PlutusV2, testCostModel PlutusV2)
+                ]
+            )
+            mempty
+            mempty
     , protocolParamMaxTxExUnits = Just defaultMaxExecutionUnits
     , protocolParamProtocolVersion = (7, 0)
     }
  where
   testCostModel pv =
-    case mkCostModel pv costModelParamsForTesting of
+    case mkCostModel pv $ Map.elems costModelParamsForTesting of
       Left e -> error $ "testCostModel failed: " <> show e
       Right cm -> cm
 
