@@ -70,7 +70,6 @@ livenessDelay = 3
 withHeartbeat ::
   ( MonadAsync m
   , MonadDelay m
-  , MonadMonotonicTime m
   ) =>
   NodeId ->
   NetworkComponent m (Heartbeat (Message tx)) a ->
@@ -120,7 +119,6 @@ updateLastSent heartbeatState now = atomically (modifyTVar' heartbeatState $ \s 
 checkHeartbeatState ::
   ( MonadDelay m
   , MonadSTM m
-  , MonadMonotonicTime m
   ) =>
   NodeId ->
   TVar m HeartbeatState ->
@@ -142,7 +140,6 @@ shouldSendHeartbeat now HeartbeatState{lastSent} =
 checkRemoteParties ::
   ( MonadDelay m
   , MonadSTM m
-  , MonadMonotonicTime m
   ) =>
   TVar m HeartbeatState ->
   NetworkCallback (Message msg) m ->

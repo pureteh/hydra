@@ -15,12 +15,11 @@ module Hydra.Ledger.Cardano.Evaluate where
 import Hydra.Prelude hiding (label)
 
 import qualified Cardano.Api.UTxO as UTxO
-import qualified Cardano.Ledger.Alonzo.Data as Ledger
 import Cardano.Ledger.Alonzo.Language (Language (PlutusV1, PlutusV2))
 import qualified Cardano.Ledger.Alonzo.PlutusScriptApi as Ledger
 import Cardano.Ledger.Alonzo.Scripts (CostModels (CostModels), mkCostModel, txscriptfee)
+import qualified Cardano.Ledger.Alonzo.Scripts.Data as Ledger
 import Cardano.Ledger.Alonzo.TxInfo (slotToPOSIXTime)
-import Cardano.Ledger.Babbage.PParams (_costmdls, _protocolVersion)
 import Cardano.Ledger.Coin (Coin (Coin))
 import Cardano.Ledger.Val (Val ((<+>)), (<×>))
 import Cardano.Slotting.EpochInfo (EpochInfo, fixedEpochInfo)
@@ -31,6 +30,7 @@ import qualified Data.ByteString as BS
 import Data.Default (def)
 import qualified Data.Map as Map
 import Data.Ratio ((%))
+import Data.SOP.Counting (NonEmpty (NonEmptyOne))
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Flat (flat)
 import Hydra.Cardano.Api (
@@ -78,7 +78,6 @@ import Ouroboros.Consensus.HardFork.History (
   initBound,
   mkInterpreter,
  )
-import Ouroboros.Consensus.Util.Counting (NonEmpty (NonEmptyOne))
 import qualified PlutusCore as PLC
 import PlutusLedgerApi.Common (mkTermToEvaluate)
 import qualified PlutusLedgerApi.Common as Plutus
@@ -201,7 +200,7 @@ estimateMinFee tx evaluationReport =
   b = Coin . fromIntegral $ protocolParamTxFeeFixed pparams
   prices =
     fromMaybe (error "no prices in protocol param fixture") $
-      toAlonzoPrices =<< protocolParamPrices pparams
+      either (const Nothing) pure . toAlonzoPrices =<< protocolParamPrices pparams
   allExunits = foldMap toLedgerExUnits . rights $ toList evaluationReport
 
 -- * Profile transactions
@@ -255,12 +254,15 @@ pparams :: ProtocolParameters
 pparams =
   (fromLedgerPParams (shelleyBasedEra @Era) def)
     { protocolParamCostModels =
-        fromAlonzoCostModels
-          . CostModels
-          $ Map.fromList
-            [ (PlutusV1, testCostModel PlutusV1)
-            , (PlutusV2, testCostModel PlutusV2)
-            ]
+        fromAlonzoCostModels $
+          CostModels
+            ( Map.fromList
+                [ (PlutusV1, testCostModel PlutusV1)
+                , (PlutusV2, testCostModel PlutusV2)
+                ]
+            )
+            mempty
+            mempty
     , protocolParamMaxTxExUnits = Just maxTxExecutionUnits
     , protocolParamMaxBlockExUnits =
         Just
@@ -282,7 +284,7 @@ pparams =
     }
  where
   testCostModel pv =
-    case mkCostModel pv costModelParamsForTesting of
+    case mkCostModel pv $ Map.elems costModelParamsForTesting of
       Left e -> error $ "testCostModel failed: " <> show e
       Right cm -> cm
 
@@ -397,6 +399,5 @@ slotNoToUTCTime :: HasCallStack => SlotNo -> UTCTime
 slotNoToUTCTime =
   either error posixToUTCTime
     . slotToPOSIXTime
-      (toLedgerPParams (shelleyBasedEra @Era) pparams)
       epochInfo
       systemStart
