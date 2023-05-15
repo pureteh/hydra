@@ -13,12 +13,13 @@ import Hydra.Cardano.Api.Lovelace (fromLedgerCoin)
 import Hydra.Cardano.Api.TxScriptValidity (toLedgerScriptValidity)
 
 import qualified Cardano.Ledger.Alonzo.Scripts as Ledger
-import qualified Cardano.Ledger.Alonzo.TxWitness as Ledger
-import qualified Cardano.Ledger.Babbage.PParams as Ledger (_prices)
+import qualified Cardano.Ledger.Alonzo.TxWits as Ledger
+import Cardano.Ledger.Babbage.Core (ppPricesL)
 import qualified Cardano.Ledger.Babbage.Tx as Ledger
 import Cardano.Ledger.BaseTypes (maybeToStrictMaybe, strictMaybeToMaybe)
 import qualified Cardano.Ledger.Core as Ledger (PParams, Tx, hashScript)
 import qualified Data.Map as Map
+import Lens.Micro ((^.))
 
 -- * Extras
 
@@ -44,8 +45,10 @@ totalExecutionCost ::
   Tx Era ->
   Lovelace
 totalExecutionCost pparams tx =
-  fromLedgerCoin (Ledger.txscriptfee (Ledger._prices pparams) executionUnits)
+  fromLedgerCoin (Ledger.txscriptfee prices executionUnits)
  where
+  prices = pparams ^. ppPricesL
+
   executionUnits =
     case tx of
       Tx (ShelleyTxBody _ _ _ (TxBodyScriptData _ _ redeemers) _ _) _ ->
@@ -73,7 +76,7 @@ toLedgerTx = \case
           , Ledger.auxiliaryData =
               maybeToStrictMaybe auxData
           , Ledger.wits =
-              Ledger.TxWitness
+              Ledger.AlonzoTxWits
                 { Ledger.txwitsVKey =
                     toLedgerKeyWitness vkWits
                 , Ledger.txwitsBoot =
