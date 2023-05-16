@@ -14,16 +14,16 @@ import Hydra.Cardano.Api hiding (initialLedgerState)
 import Hydra.Ledger.Cardano.Builder
 
 import qualified Cardano.Api.UTxO as UTxO
-import Cardano.Binary (decodeAnnotator, serialize')
+import Cardano.Binary (serialize')
 import qualified Cardano.Crypto.DSIGN as CC
-import qualified Cardano.Ledger.Babbage.Tx as Ledger
-import Cardano.Ledger.BaseTypes (StrictMaybe (..))
 import qualified Cardano.Ledger.BaseTypes as Ledger
+import Cardano.Ledger.Binary (decCBOR, decodeFullAnnotator)
+import Cardano.Ledger.Core (eraProtVerLow)
 import qualified Cardano.Ledger.Credential as Ledger
 import qualified Cardano.Ledger.Shelley.API.Mempool as Ledger
 import qualified Cardano.Ledger.Shelley.Genesis as Ledger
 import qualified Cardano.Ledger.Shelley.LedgerState as Ledger
-import qualified Cardano.Ledger.Shelley.Rules.Ledger as Ledger
+import qualified Cardano.Ledger.Shelley.Rules as Ledger
 import qualified Cardano.Ledger.Shelley.UTxO as Ledger
 import qualified Codec.CBOR.Decoding as CBOR
 import qualified Codec.CBOR.Encoding as CBOR
@@ -83,7 +83,7 @@ cardanoLedger globals ledgerEnv =
       Left err ->
         Left (tx, toValidationError err)
       Right (Ledger.LedgerState{Ledger.lsUTxOState = us}, _validatedTx) ->
-        Right . fromLedgerUTxO $ Ledger._utxo us
+        Right . fromLedgerUTxO $ Ledger.utxosUtxo us
    where
     toValidationError = ValidationError . show
 
@@ -91,7 +91,7 @@ cardanoLedger globals ledgerEnv =
 
     memPoolState =
       Ledger.LedgerState
-        { Ledger.lsUTxOState = def{Ledger._utxo = toLedgerUTxO utxo}
+        { Ledger.lsUTxOState = def{Ledger.utxosUtxo = toLedgerUTxO utxo}
         , Ledger.lsDPState = def
         }
 
@@ -112,24 +112,20 @@ instance ToCBOR Tx where
 instance FromCBOR Tx where
   fromCBOR = do
     bs <- CBOR.decodeBytes
-    decodeAnnotator "Tx" fromCBOR (fromStrict bs)
+    decodeFullAnnotator (eraProtVerLow @LedgerEra) "Tx" decCBOR (fromStrict bs)
       & either
         (fail . toString . toLazyText . build)
         (pure . fromLedgerTx)
 
 instance ToJSON Tx where
-  toJSON = toJSON . toLedgerTx
+  toJSON = toJSON . toLedgerTx -- FIXME: This likely broken
 
 instance FromJSON Tx where
-  parseJSON = fmap fromLedgerTx . parseJSON
+  parseJSON = undefined -- FIXME: broken fmap fromLedgerTx . parseJSON
 
 instance Arbitrary Tx where
   -- TODO: shrinker!
-  arbitrary = fromLedgerTx . withoutProtocolUpdates <$> arbitrary
-   where
-    withoutProtocolUpdates tx@(Ledger.AlonzoTx body _ _ _) =
-      let body' = body{Ledger.txUpdates = SNothing}
-       in tx{Ledger.body = body'}
+  arbitrary = fromLedgerTx <$> arbitrary
 
 -- | Create a zero-fee, payment cardano transaction.
 mkSimpleTx ::
