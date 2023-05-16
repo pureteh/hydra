@@ -12,6 +12,7 @@ import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Hydra.Cardano.Api (
   CardanoMode,
   EraHistory (EraHistory),
+  File (..),
   NetworkId,
  )
 import Hydra.Cardano.Api.Prelude (ChainPoint (ChainPoint, ChainPointAtGenesis))
@@ -104,8 +105,10 @@ mkTimeHandle currentSlotNo systemStart eraHistory = do
 
 -- | Query node for system start and era history before constructing a
 -- 'TimeHandle' using the slot at the tip of the network.
+-- XXX: Use 'SocketPath'
 queryTimeHandle :: NetworkId -> FilePath -> IO TimeHandle
-queryTimeHandle networkId socketPath = do
+queryTimeHandle networkId fp = do
+  let socketPath = File fp
   tip <- queryTip networkId socketPath
   systemStart <- querySystemStart networkId socketPath QueryTip
   eraHistory <- queryEraHistory networkId socketPath QueryTip
