@@ -20,10 +20,7 @@ data HydraLog tx net
   | APIServer {api :: APIServerLog}
   | Network {network :: net}
   | Node {node :: HydraNodeLog tx}
-  | CreatedState
-  | LoadedState
   | NodeOptions {runOptions :: RunOptions}
-  | Misconfiguration {misconfigurationErrors :: [ParamMismatch]}
   deriving (Generic)
 
 deriving instance (Eq net, Eq (HydraNodeLog tx)) => Eq (HydraLog tx net)

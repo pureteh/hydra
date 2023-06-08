@@ -19,14 +19,18 @@ import Control.Concurrent.Class.MonadSTM (
  )
 import Hydra.API.Server (Server, sendOutput)
 import Hydra.Cardano.Api (AsType (AsSigningKey, AsVerificationKey))
-import Hydra.Chain (Chain (..), ChainStateType, IsChainState, PostTxError)
+import Hydra.Chain (Chain (..), ChainStateType, HeadParameters (..), IsChainState, PostTxError)
 import Hydra.Chain.Direct.Util (readFileTextEnvelopeThrow)
 import Hydra.Crypto (AsType (AsHydraKey))
 import Hydra.HeadLogic (
+  ClosedState (..),
   Effect (..),
   Environment (..),
   Event (..),
   HeadState (..),
+  IdleState (IdleState),
+  InitialState (..),
+  OpenState (..),
   Outcome (..),
   defaultTTL,
  )
@@ -36,7 +40,7 @@ import Hydra.Logging (Tracer, traceWith)
 import Hydra.Network (Network (..))
 import Hydra.Network.Message (Message)
 import Hydra.Node.EventQueue (EventQueue (..), Queued (..))
-import Hydra.Options (ChainConfig (..), RunOptions (..))
+import Hydra.Options (ChainConfig (..), ParamMismatch (..), ParamMismatchError (..), RunOptions (..))
 import Hydra.Party (Party (..), deriveParty)
 import Hydra.Persistence (Persistence (..))
 
@@ -76,6 +80,9 @@ data HydraNodeLog tx
   | BeginEffect {by :: Party, eventId :: Word64, effectId :: Word32, effect :: Effect tx}
   | EndEffect {by :: Party, eventId :: Word64, effectId :: Word32}
   | LogicOutcome {by :: Party, outcome :: Outcome tx}
+  | CreatedState
+  | LoadedState
+  | Misconfiguration {misconfigurationErrors :: [ParamMismatch]}
   deriving stock (Generic)
 
 deriving instance (IsTx tx, IsChainState tx) => Eq (HydraNodeLog tx)
@@ -91,14 +98,60 @@ runHydraNode ::
   , MonadCatch m
   , MonadAsync m
   , IsChainState tx
+  , MonadLabelledSTM m
   ) =>
   Tracer m (HydraNodeLog tx) ->
   HydraNode tx m ->
   m ()
-runHydraNode tracer node =
+runHydraNode tracer node@HydraNode{env, persistence} = do
+  loadedState <- loadPersistentState tracer env persistence
   -- NOTE(SN): here we could introduce concurrent head processing, e.g. with
   -- something like 'forM_ [0..1] $ async'
-  forever $ stepHydraNode tracer node
+  forever $ stepHydraNode tracer (maybe node (\nodeState -> node{nodeState}) loadedState)
+
+loadPersistentState ::
+  ( MonadThrow m
+  , MonadCatch m
+  , MonadAsync m
+  , IsChainState tx
+  , MonadLabelledSTM m
+  ) =>
+  Tracer m (HydraNodeLog tx) ->
+  Environment ->
+  Persistence (HeadState tx) m ->
+  m (Maybe (NodeState tx m))
+loadPersistentState tracer env persistence = do
+  load persistence >>= \case
+    Nothing -> pure Nothing
+    Just headState -> do
+      traceWith tracer LoadedState
+      let paramsMismatch = checkParamsAgainstExistingState headState env
+      unless (null paramsMismatch) $ do
+        traceWith tracer (Misconfiguration paramsMismatch)
+        throwIO $ ParamMismatchError paramsMismatch
+      Just <$> createNodeState headState
+
+-- check if hydra-node parameters are matching with the hydra-node state.
+checkParamsAgainstExistingState :: HeadState tx -> Environment -> [ParamMismatch]
+checkParamsAgainstExistingState hs env =
+  -- TODO: test me (See end2endTest)
+  case hs of
+    Idle _ -> []
+    Initial InitialState{parameters} -> validateParameters parameters
+    Open OpenState{parameters} -> validateParameters parameters
+    Closed ClosedState{parameters} -> validateParameters parameters
+ where
+  validateParameters HeadParameters{contestationPeriod = loadedCp, parties} =
+    flip execState [] $ do
+      when (loadedCp /= configuredCp) $
+        modify (<> [ContestationPeriodMismatch{loadedCp, configuredCp}])
+      when (loadedParties /= configuredParties) $
+        modify (<> [PartiesMismatch{loadedParties, configuredParties}])
+   where
+    loadedParties = sort parties
+
+  Environment{contestationPeriod = configuredCp, otherParties, party} = env
+  configuredParties = sort (party : otherParties)
 
 stepHydraNode ::
   ( MonadThrow m

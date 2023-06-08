@@ -55,10 +55,6 @@ import Hydra.Options (
  )
 import Hydra.Persistence (Persistence (load), createPersistence, createPersistenceIncremental)
 
-newtype ParamMismatchError = ParamMismatchError String deriving (Eq, Show)
-
-instance Exception ParamMismatchError
-
 main :: IO ()
 main = do
   command <- parseHydraCommand
@@ -79,24 +75,7 @@ main = do
         let RunOptions{hydraScriptsTxId, chainConfig} = opts
         -- Load state from persistence or create new one
         persistence <- createPersistence $ persistenceDir <> "/state"
-        hs <-
-          load persistence >>= \case
-            Nothing -> do
-              traceWith tracer CreatedState
-              pure $ Idle IdleState{chainState = initialChainState}
-            Just headState -> do
-              traceWith tracer LoadedState
-              let paramsMismatch = checkParamsAgainstExistingState headState env
-              unless (null paramsMismatch) $ do
-                traceWith tracer (Misconfiguration paramsMismatch)
-                throwIO $
-                  ParamMismatchError $
-                    "Loaded state does not match given command line options."
-                      <> " Please check the state in: "
-                      <> persistenceDir
-                      <> " against provided command line options."
-              pure headState
-        nodeState <- createNodeState hs
+
         ctx <- loadChainContext chainConfig party otherParties hydraScriptsTxId
         wallet <- mkTinyWallet (contramap DirectChain tracer) chainConfig
         withDirectChain (contramap DirectChain tracer) chainConfig ctx wallet (getChainState hs) (putEvent . OnChainEvent) $ \chain -> do
@@ -107,7 +86,8 @@ main = do
             apiPersistence <- createPersistenceIncremental $ persistenceDir <> "/server-output"
             withAPIServer apiHost apiPort party apiPersistence (contramap APIServer tracer) chain (putEvent . ClientEvent) $ \server -> do
               let RunOptions{ledgerConfig} = opts
-              withCardanoLedger ledgerConfig chainConfig $ \ledger ->
+              withCardanoLedger ledgerConfig chainConfig $ \ledger -> do
+                nodeState <- createNodeState (Idle IdleState{chainState = initialChainState})
                 runHydraNode (contramap Node tracer) $
                   HydraNode{eq, hn, nodeState, oc = chain, server, ledger, env, persistence}
 
@@ -129,27 +109,6 @@ main = do
         <$> readJsonFileThrow protocolParametersFromJson (cardanoLedgerProtocolParametersFile ledgerConfig)
 
     action (Ledger.cardanoLedger globals ledgerEnv)
-
-  -- check if hydra-node parameters are matching with the hydra-node state.
-  checkParamsAgainstExistingState :: HeadState Ledger.Tx -> Environment -> [ParamMismatch]
-  checkParamsAgainstExistingState hs env =
-    case hs of
-      Idle _ -> []
-      Initial InitialState{parameters} -> validateParameters parameters
-      Open OpenState{parameters} -> validateParameters parameters
-      Closed ClosedState{parameters} -> validateParameters parameters
-   where
-    validateParameters HeadParameters{contestationPeriod = loadedCp, parties} =
-      flip execState [] $ do
-        when (loadedCp /= configuredCp) $
-          modify (<> [ContestationPeriodMismatch{loadedCp, configuredCp}])
-        when (loadedParties /= configuredParties) $
-          modify (<> [PartiesMismatch{loadedParties, configuredParties}])
-     where
-      loadedParties = sort parties
-
-    Environment{contestationPeriod = configuredCp, otherParties, party} = env
-    configuredParties = sort (party : otherParties)
 
 identifyNode :: RunOptions -> RunOptions
 identifyNode opt@RunOptions{verbosity = Verbose "HydraNode", nodeId} = opt{verbosity = Verbose $ "HydraNode-" <> show nodeId}

@@ -481,6 +481,19 @@ spec = parallel $ do
             send n1 (NewTx (aValidTx 42))
             waitUntil [n1] $ TxValid testHeadId (aValidTx 42)
 
+  describe "State persistence" $ do
+    it "can restarts from persisted state" $
+      shouldRunInSim $ do
+        withSimulatedChainAndNetwork $ \chain -> do
+          persistence <- withHydraNode' aliceSk [] chain $ \n1 node -> do
+            send n1 Init
+            waitUntil [n1] $ HeadIsInitializing testHeadId (fromList [alice])
+            pure $ persistence node
+
+          withHydraNode'' aliceSk [] chain persistence $ \n1 -> do
+            send n1 (Commit (utxoRef 1))
+            waitUntil [n1] $ Committed testHeadId alice (utxoRef 1)
+
 -- | Wait for some output at some node(s) to be produced /eventually/. See
 -- 'waitUntilMatch' for how long it waits.
 waitUntil ::
@@ -722,7 +735,39 @@ withHydraNode signingKey otherParties chain action = do
   outputHistory <- newTVarIO mempty
   nodeState <- createNodeState $ Idle IdleState{chainState = SimpleChainState{slot = ChainSlot 0}}
   node <- createHydraNode simpleLedger nodeState signingKey otherParties outputs outputHistory chain testContestationPeriod
-  withAsync (runHydraNode traceInIOSim node) $ \_ ->
+  withAsync (runHydraNode traceInIOSim node) $ \_ -> do
+    action (createTestHydraClient outputs outputHistory node)
+
+withHydraNode' ::
+  forall s a.
+  SigningKey HydraKey ->
+  [Party] ->
+  SimulatedChainNetwork SimpleTx (IOSim s) ->
+  (TestHydraClient SimpleTx (IOSim s) -> HydraNode SimpleTx (IOSim s) -> IOSim s a) ->
+  IOSim s a
+withHydraNode' signingKey otherParties chain action = do
+  outputs <- atomically newTQueue
+  outputHistory <- newTVarIO mempty
+  nodeState <- createNodeState $ Idle IdleState{chainState = SimpleChainState{slot = ChainSlot 0}}
+  node <- createHydraNode simpleLedger nodeState signingKey otherParties outputs outputHistory chain testContestationPeriod
+  withAsync (runHydraNode traceInIOSim node) $ \_ -> do
+    action (createTestHydraClient outputs outputHistory node) node
+
+withHydraNode'' ::
+  forall s a.
+  SigningKey HydraKey ->
+  [Party] ->
+  SimulatedChainNetwork SimpleTx (IOSim s) ->
+  Persistence (HeadState SimpleTx) (IOSim s) ->
+  (TestHydraClient SimpleTx (IOSim s) -> IOSim s a) ->
+  IOSim s a
+withHydraNode'' signingKey otherParties chain persistence action = do
+  outputs <- atomically newTQueue
+  outputHistory <- newTVarIO mempty
+  nodeState <- createNodeState $ Idle IdleState{chainState = SimpleChainState{slot = ChainSlot 0}}
+  let chain' = chain{connectNode = \n -> (connectNode chain) n{persistence}}
+  node <- createHydraNode simpleLedger nodeState signingKey otherParties outputs outputHistory chain' testContestationPeriod
+  withAsync (runHydraNode traceInIOSim node) $ \_ -> do
     action (createTestHydraClient outputs outputHistory node)
 
 createTestHydraClient ::
