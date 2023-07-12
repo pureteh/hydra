@@ -652,18 +652,20 @@ onOpenNetworkReqTx env ledger st ttl tx =
           NewState (Open st{coordinatedHeadState = trackTxInState})
             `Combined` Wait (WaitOnNotApplicableTx err)
     Right utxo' ->
-      NewState
-        ( Open
-            st
-              { coordinatedHeadState =
-                  trackTxInState
-                    { seenTxs = seenTxs <> [tx]
-                    , seenUTxO = utxo'
-                    }
-              }
-        )
-        `Combined` Effects [ClientEffect $ TxValid headId tx]
-        & emitSnapshot env
+      -- calculate new outcome -> produce an event with the diff
+      let outcome = NewState
+            ( Open
+                st
+                  { coordinatedHeadState =
+                      trackTxInState
+                        { seenTxs = seenTxs <> [tx]
+                        , seenUTxO = utxo'
+                        }
+                  }
+            )
+            `Combined` Effects [ClientEffect $ TxValid headId tx]
+        -- decorate the new outcome to produce another new outcome
+        in emitSnapshot env outcome
  where
   Ledger{applyTransactions} = ledger
 
@@ -824,20 +826,22 @@ onOpenNetworkAckSn env openState otherParty snapshotSignature sn =
           let multisig = aggregateInOrder sigs' parties
           let allTxs' = foldr Map.delete allTxs confirmed
           requireVerifiedMultisignature multisig snapshot $
-            NewState
-              ( onlyUpdateCoordinatedHeadState $
-                  coordinatedHeadState
-                    { confirmedSnapshot =
-                        ConfirmedSnapshot
-                          { snapshot
-                          , signatures = multisig
-                          }
-                    , seenSnapshot = LastSeenSnapshot (number snapshot)
-                    , allTxs = allTxs'
-                    }
-              )
-              `Combined` Effects [ClientEffect $ SnapshotConfirmed headId snapshot multisig]
-              & emitSnapshot env
+            -- calculate new outcome -> produce an event with the diff
+            let outcome = NewState
+                ( onlyUpdateCoordinatedHeadState $
+                    coordinatedHeadState
+                      { confirmedSnapshot =
+                          ConfirmedSnapshot
+                            { snapshot
+                            , signatures = multisig
+                            }
+                      , seenSnapshot = LastSeenSnapshot (number snapshot)
+                      , allTxs = allTxs'
+                      }
+                )
+                `Combined` Effects [ClientEffect $ SnapshotConfirmed headId snapshot multisig]
+              -- decorate the new outcome to produce another new outcome
+              in emitSnapshot env outcome
  where
   seenSn = seenSnapshotNumber seenSnapshot
 
@@ -1176,3 +1180,28 @@ emitSnapshot env outcome =
         _ -> outcome
     Combined l r -> Combined (emitSnapshot env l) (emitSnapshot env r)
     _ -> outcome
+
+emitSnapshot' :: IsTx tx => Environment -> OpenState tx -> OpenState tx
+emitSnapshot' env ost@(OpenState{parameters, coordinatedHeadState, chainState, headId, currentSlot}) =
+    case newSn env parameters coordinatedHeadState of
+      ShouldSnapshot sn txs -> do
+        let CoordinatedHeadState{seenSnapshot} = coordinatedHeadState
+        NewState
+          ( Open
+              OpenState
+                { parameters
+                , coordinatedHeadState =
+                    coordinatedHeadState
+                      { seenSnapshot =
+                          RequestedSnapshot
+                            { lastSeen = seenSnapshotNumber seenSnapshot
+                            , requested = sn
+                            }
+                      }
+                , chainState
+                , headId
+                , currentSlot
+                }
+          )
+          `Combined` Effects [NetworkEffect (ReqSn sn (txId <$> txs))]
+      _ -> ost
