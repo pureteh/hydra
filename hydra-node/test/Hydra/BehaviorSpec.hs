@@ -4,7 +4,7 @@
 module Hydra.BehaviorSpec where
 
 import Hydra.Prelude
-import Test.Hydra.Prelude hiding (shouldBe, shouldNotBe, shouldReturn, shouldSatisfy)
+import Test.Hydra.Prelude hiding (shouldBe, shouldContain, shouldNotBe, shouldReturn, shouldSatisfy)
 
 import Control.Concurrent.Class.MonadSTM (
   MonadLabelledSTM,
@@ -67,7 +67,7 @@ import Hydra.Persistence (Persistence (Persistence, load, save))
 import Hydra.Snapshot (Snapshot (..), SnapshotNumber, getSnapshot)
 import Test.Aeson.GenericSpecs (roundtripAndGoldenSpecs)
 import Test.Hydra.Fixture (alice, aliceSk, bob, bobSk)
-import Test.Util (shouldBe, shouldNotBe, shouldRunInSim, traceInIOSim)
+import Test.Util (shouldBe, shouldContain, shouldNotBe, shouldRunInSim, traceInIOSim)
 
 spec :: Spec
 spec = parallel $ do
@@ -357,27 +357,64 @@ spec = parallel $ do
             withHydraNode aliceSk [bob] chain $ \n1 -> do
               withHydraNode bobSk [alice] chain $ \n2 -> do
                 openHead n1 n2
-                let tx' =
-                      SimpleTx
-                        { txSimpleId = 1
-                        , txInputs = utxoRef 1
-                        , txOutputs = utxoRef 10
-                        }
-                    tx'' =
-                      SimpleTx
-                        { txSimpleId = 2
-                        , txInputs = utxoRef 1
-                        , txOutputs = utxoRef 11
-                        }
-                send n1 (NewTx tx')
-                send n2 (NewTx tx'')
+                let tx1 = SimpleTx 1 (utxoRef 1) (utxoRef 10)
+                    tx2 = SimpleTx 2 (utxoRef 1) (utxoRef 11)
+                send n1 (NewTx tx1)
+                send n2 (NewTx tx2)
                 waitUntil [n1, n2] $ do
                   let snapshot = Snapshot 1 (utxoRefs [2, 10]) [1]
                       sigs = aggregate [sign aliceSk snapshot, sign bobSk snapshot]
                   SnapshotConfirmed testHeadId snapshot sigs
                 waitUntilMatch [n1, n2] $ \case
-                  TxInvalid{transaction} -> transaction == tx''
+                  TxInvalid{transaction} -> transaction == tx2
                   _ -> False
+
+      it "leader decides how to resolve conflicting transactions" $
+        shouldRunInSim $
+          withSimulatedChainAndNetwork $ \chain ->
+            withHydraNode aliceSk [bob] chain $ \n1 -> do
+              withHydraNode bobSk [alice] chain $ \n2 -> do
+                openHead n1 n2
+                -- By creating two conflicting, not-yet-valid transactions, we
+                -- force creation of a different local view in both nodes. This
+                -- is needed to have network retransmission and ttl re-enqueing
+                -- effects impact the way ledger states are used to consider
+                -- snapshot validity.
+                let tx1 = SimpleTx 1 (utxoRef 10) (utxoRef 11)
+                    tx2 = SimpleTx 2 (utxoRef 10) (utxoRef 12)
+                race_
+                  (send n1 $ NewTx tx1)
+                  (send n2 $ NewTx tx2)
+
+                -- Need to wait long enough so both transactions expire
+                threadDelay $ fromIntegral defaultTTL * waitDelay + 1
+
+                waitUntilMatch [n1, n2] $ \case
+                  TxInvalid{transaction} -> transaction == tx1
+                  _ -> False
+
+                waitUntilMatch [n1, n2] $ \case
+                  TxInvalid{transaction} -> transaction == tx2
+                  _ -> False
+
+                -- Unlock both invalid transactions, but expect none of them
+                -- being requested for snapshot right away.
+                send n1 $ NewTx $ SimpleTx 3 (utxoRef 1) (utxoRef 10)
+
+                confirmedTxIds1 <- failAfter 10 $
+                  waitMatch n1 $ \case
+                    SnapshotConfirmed{snapshot = Snapshot{confirmed}} -> Just confirmed
+                    _ -> Nothing
+                confirmedTxIds1 `shouldBe` [3]
+
+                -- Upon seeing this snapshot though, we expect the leader (bob)
+                -- to decide to snapshot "his" variant of the original
+                -- transactions.
+                confirmedTxIds2 <- failAfter 10 $
+                  waitMatch n1 $ \case
+                    SnapshotConfirmed{snapshot = Snapshot{confirmed}} -> Just confirmed
+                    _ -> Nothing
+                confirmedTxIds2 `shouldBe` [2]
 
       it "outputs utxo from confirmed snapshot when client requests it" $
         shouldRunInSim $ do
@@ -440,7 +477,7 @@ spec = parallel $ do
               waitUntil [n1, n2] HeadIsContested{snapshotNumber = 1, headId = testHeadId}
 
   describe "Hydra Node Logging" $ do
-    it "traces processing of events" $ do
+    it @(IO ()) "traces processing of events" $ do
       let result = runSimTrace $ do
             withSimulatedChainAndNetwork $ \chain ->
               withHydraNode aliceSk [] chain $ \n1 -> do
@@ -455,7 +492,7 @@ spec = parallel $ do
       logs
         `shouldContain` [EndEvent alice 0]
 
-    it "traces handling of effects" $ do
+    it @(IO ()) "traces handling of effects" $ do
       let result = runSimTrace $ do
             withSimulatedChainAndNetwork $ \chain ->
               withHydraNode aliceSk [] chain $ \n1 -> do
