@@ -62,7 +62,6 @@ import Hydra.Crypto (HydraKey)
 import Hydra.HeadLogic (
   Committed (),
   IdleState (..),
-  PendingCommits,
  )
 import qualified Hydra.HeadLogic as HeadState
 import Hydra.Ledger (IsTx (..))
@@ -114,7 +113,7 @@ data GlobalState
   | Initial
       { headParameters :: HeadParameters
       , commits :: Committed Payment
-      , pendingCommits :: PendingCommits
+      , pendingCommits :: Set Party
       }
   | Open
       { headParameters :: HeadParameters
