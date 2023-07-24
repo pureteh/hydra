@@ -379,16 +379,20 @@ data StateChanged tx
       , committedUTxO :: UTxOType tx
       , chainState :: ChainStateType tx
       }
+  | TransactionAppliedToLocalUTxO
+      { tx :: tx
+      , utxo :: UTxOType tx
+      }
   | StateReplaced (HeadState tx)
   deriving stock (Generic)
 
-instance (Arbitrary (HeadState tx), Arbitrary (ChainStateType tx), Arbitrary (UTxOType tx)) => Arbitrary (StateChanged tx) where
+instance (Arbitrary tx, Arbitrary (HeadState tx), Arbitrary (ChainStateType tx), Arbitrary (UTxOType tx)) => Arbitrary (StateChanged tx) where
   arbitrary = genericArbitrary
 
-deriving instance (Eq (HeadState tx), Eq (UTxOType tx), Eq (ChainStateType tx)) => Eq (StateChanged tx)
-deriving instance (Show (HeadState tx), Show (UTxOType tx), Show (ChainStateType tx)) => Show (StateChanged tx)
-deriving instance (ToJSON (HeadState tx), ToJSON (UTxOType tx), ToJSON (ChainStateType tx)) => ToJSON (StateChanged tx)
-deriving instance (FromJSON (HeadState tx), FromJSON (UTxOType tx), FromJSON (ChainStateType tx)) => FromJSON (StateChanged tx)
+deriving instance (Eq tx, Eq (HeadState tx), Eq (UTxOType tx), Eq (ChainStateType tx)) => Eq (StateChanged tx)
+deriving instance (Show tx, Show (HeadState tx), Show (UTxOType tx), Show (ChainStateType tx)) => Show (StateChanged tx)
+deriving instance (ToJSON tx, ToJSON (HeadState tx), ToJSON (UTxOType tx), ToJSON (ChainStateType tx)) => ToJSON (StateChanged tx)
+deriving instance (FromJSON tx, FromJSON (HeadState tx), FromJSON (UTxOType tx), FromJSON (ChainStateType tx)) => FromJSON (StateChanged tx)
 
 data Outcome tx
   = NoOutcome
@@ -452,7 +456,7 @@ collectWaits = \case
   Combined l r -> collectWaits l <> collectWaits r
 
 -- FIXME: This is only used in tests
-collectState :: Outcome tx -> [HeadState tx]
+collectState :: HasCallStack => Outcome tx -> [HeadState tx]
 collectState = \case
   NoOutcome -> []
   Error _ -> []
@@ -460,6 +464,8 @@ collectState = \case
   StateChanged s ->
     case s of
       HeadInitialized{} -> undefined
+      CommittedUTxO{} -> undefined
+      TransactionAppliedToLocalUTxO{} -> undefined
       StateReplaced sc -> [sc]
   Effects _ -> []
   Combined l r -> collectState l <> collectState r
@@ -702,7 +708,7 @@ onOpenNetworkReqTx env ledger st ttl tx = do
                     }
             )
             `Combined` Effects [NetworkEffect (ReqSn nextSn (txId <$> localTxs'))]
-        else StateChanged (StateReplaced $ Open st{coordinatedHeadState = chs''})
+        else StateChanged (TransactionAppliedToLocalUTxO{tx = tx, utxo = utxo'})
  where
   waitApplyTx chs cont =
     case applyTransactions currentSlot localUTxO [tx] of
@@ -1207,7 +1213,7 @@ isLeader HeadParameters{parties} p sn =
 -- * HeadState aggregate
 
 -- | Reflect 'StateChanged' events onto the 'HeadState' aggregate.
-aggregate :: HeadState tx -> StateChanged tx -> HeadState tx
+aggregate :: IsTx tx => HeadState tx -> StateChanged tx -> HeadState tx
 aggregate st = \case
   HeadInitialized{parameters = parameters@HeadParameters{parties}, headId, chainState} ->
     Initial
@@ -1218,10 +1224,9 @@ aggregate st = \case
         , chainState
         , headId
         }
-  CommittedUTxO{committedUTxO, chainState, party} -> case st of
-    Initial InitialState{parameters, pendingCommits, committed, headId} -> newState
-     where
-      newState =
+  CommittedUTxO{committedUTxO, chainState, party} ->
+    case st of
+      Initial InitialState{parameters, pendingCommits, committed, headId} ->
         Initial
           InitialState
             { parameters
@@ -1230,8 +1235,23 @@ aggregate st = \case
             , chainState
             , headId
             }
-
-      newCommitted = Map.insert party committedUTxO committed
-      remainingParties = Set.delete party pendingCommits
-    _ -> st
+       where
+        newCommitted = Map.insert party committedUTxO committed
+        remainingParties = Set.delete party pendingCommits
+      _otherState -> st
+  TransactionAppliedToLocalUTxO{tx, utxo} ->
+    case st of
+      Open os@OpenState{coordinatedHeadState} ->
+        Open
+          os
+            { coordinatedHeadState =
+                coordinatedHeadState
+                  { allTxs = allTxs <> fromList [(txId tx, tx)]
+                  , localUTxO = utxo
+                  , localTxs = localTxs <> [tx]
+                  }
+            }
+       where
+        CoordinatedHeadState{allTxs, localTxs} = coordinatedHeadState
+      _otherState -> st
   StateReplaced newState -> newState
