@@ -24,7 +24,9 @@ import Hydra.API.RestServer (
   DraftCommitTxRequest (..),
   DraftCommitTxResponse (..),
   ScriptInfo (..),
-  TxOutWithWitness (..), SubmitTxRequest (..), SubmitTxResponse (..),
+  SubmitTxRequest (..),
+  SubmitTxResponse (..),
+  TxOutWithWitness (..),
  )
 import Hydra.Cardano.Api (
   Lovelace (..),
@@ -32,8 +34,11 @@ import Hydra.Cardano.Api (
   Tx,
   TxId,
   fromPlutusScript,
+  lovelaceToValue,
   mkScriptAddress,
+  mkVkAddress,
   selectLovelace,
+  signTx,
   toScriptData,
  )
 import Hydra.Chain (HeadId)
@@ -43,6 +48,7 @@ import Hydra.Cluster.Fixture (Actor (..), actorName, alice, aliceSk, aliceVk, bo
 import Hydra.Cluster.Util (chainConfigFor, keysFor)
 import Hydra.ContestationPeriod (ContestationPeriod (UnsafeContestationPeriod))
 import Hydra.Ledger (IsTx (balance))
+import Hydra.Ledger.Cardano (mkSimpleTx)
 import Hydra.Logging (Tracer, traceWith)
 import Hydra.Options (ChainConfig, networkId, startChainFrom)
 import Hydra.Party (Party)
@@ -63,7 +69,8 @@ import Network.HTTP.Req (
  )
 import qualified PlutusLedgerApi.Test.Examples as Plutus
 import Test.Hspec.Expectations (shouldBe, shouldThrow)
-import Test.QuickCheck (generate)
+import Test.Hydra.Prelude (failure)
+import qualified Prelude
 
 restartedNodeCanObserveCommitTx :: Tracer IO EndToEndLog -> FilePath -> RunningNode -> TxId -> IO ()
 restartedNodeCanObserveCommitTx tracer workDir cardanoNode hydraScriptsTxId = do
@@ -346,28 +353,35 @@ canSubmitUserTransaction ::
   RunningNode ->
   TxId ->
   IO ()
-canSubmitUserTransaction tracer workDir node hydraScriptsTxId =
+canSubmitUserTransaction tracer workDir node@RunningNode{networkId} hydraScriptsTxId =
   (`finally` returnFundsToFaucet tracer node Alice) $ do
     refuelIfNeeded tracer node Alice 25_000_000
     aliceChainConfig <- chainConfigFor Alice workDir nodeSocket [] $ UnsafeContestationPeriod 100
     let hydraNodeId = 1
     withHydraNode tracer aliceChainConfig workDir hydraNodeId aliceSk [] [1] hydraScriptsTxId $ \_ -> do
-      tx <- generate arbitrary
-      let userTx =
-            SubmitTxRequest
-              { txToSubmit = tx
-              }
-      res <-
-        runReq defaultHttpConfig $
-          req
-            POST
-            (http "127.0.0.1" /: "submit-user-tx")
-            (ReqBodyJson userTx)
-            (Proxy :: Proxy (JsonResponse SubmitTxResponse))
-            (port $ 4000 + hydraNodeId)
+      (cardanoBobVk, cardanoBobSk) <- keysFor Bob
+      (cardanoCarolVk, _cardanoCarolSk) <- keysFor Carol
+      bobUTxO <- Prelude.head . UTxO.pairs <$> seedFromFaucet node cardanoBobVk 5_000_000 Normal (contramap FromFaucet tracer)
+      let address = mkVkAddress networkId cardanoCarolVk
+      case mkSimpleTx bobUTxO (address, lovelaceToValue $ Lovelace 0) cardanoBobSk of
+        Left e -> failure $ show e
+        Right tx -> do
+          let signedTx = signTx cardanoBobSk tx
+          let userTx =
+                SubmitTxRequest
+                  { txToSubmit = signedTx
+                  }
+          res <-
+            runReq defaultHttpConfig $
+              req
+                POST
+                (http "127.0.0.1" /: "submit-user-tx")
+                (ReqBodyJson userTx)
+                (Proxy :: Proxy (JsonResponse SubmitTxResponse))
+                (port $ 4000 + hydraNodeId)
 
-      let SubmitTxResponse{submitTxResponse} = responseBody res
-      submitTxResponse `shouldBe` "TX Submitted"
+          let SubmitTxResponse{submitTxResponse} = responseBody res
+          submitTxResponse `shouldBe` "TX Submitted"
  where
   RunningNode{nodeSocket} = node
 
