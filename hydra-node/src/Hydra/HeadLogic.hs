@@ -374,16 +374,21 @@ data StateChanged tx
       , chainState :: ChainStateType tx
       , headId :: HeadId
       }
+  | CommittedUTxO
+      { party :: Party
+      , committedUTxO :: UTxOType tx
+      , chainState :: ChainStateType tx
+      }
   | StateReplaced (HeadState tx)
   deriving stock (Generic)
 
-instance (Arbitrary (HeadState tx), Arbitrary (ChainStateType tx)) => Arbitrary (StateChanged tx) where
+instance (Arbitrary (HeadState tx), Arbitrary (ChainStateType tx), Arbitrary (UTxOType tx)) => Arbitrary (StateChanged tx) where
   arbitrary = genericArbitrary
 
-deriving instance (Eq (HeadState tx), Eq (ChainStateType tx)) => Eq (StateChanged tx)
-deriving instance (Show (HeadState tx), Show (ChainStateType tx)) => Show (StateChanged tx)
-deriving instance (ToJSON (HeadState tx), ToJSON (ChainStateType tx)) => ToJSON (StateChanged tx)
-deriving instance (FromJSON (HeadState tx), FromJSON (ChainStateType tx)) => FromJSON (StateChanged tx)
+deriving instance (Eq (HeadState tx), Eq (UTxOType tx), Eq (ChainStateType tx)) => Eq (StateChanged tx)
+deriving instance (Show (HeadState tx), Show (UTxOType tx), Show (ChainStateType tx)) => Show (StateChanged tx)
+deriving instance (ToJSON (HeadState tx), ToJSON (UTxOType tx), ToJSON (ChainStateType tx)) => ToJSON (StateChanged tx)
+deriving instance (FromJSON (HeadState tx), FromJSON (UTxOType tx), FromJSON (ChainStateType tx)) => FromJSON (StateChanged tx)
 
 data Outcome tx
   = NoOutcome
@@ -543,22 +548,12 @@ onInitialChainCommitTx ::
   Outcome tx
 onInitialChainCommitTx st newChainState pt utxo =
   StateChanged
-    (StateReplaced newState)
+    (CommittedUTxO{party = pt, committedUTxO = utxo, chainState = newChainState})
     `Combined` Effects
       ( notifyClient
           : [postCollectCom | canCollectCom]
       )
  where
-  newState =
-    Initial
-      InitialState
-        { parameters
-        , pendingCommits = remainingParties
-        , committed = newCommitted
-        , chainState = newChainState
-        , headId
-        }
-
   newCommitted = Map.insert pt utxo committed
 
   notifyClient = ClientEffect $ Committed headId pt utxo
@@ -572,7 +567,7 @@ onInitialChainCommitTx st newChainState pt utxo =
 
   remainingParties = Set.delete pt pendingCommits
 
-  InitialState{parameters, pendingCommits, committed, headId} = st
+  InitialState{pendingCommits, committed, headId} = st
 
 -- | Client request to abort the head. This leads to an abort transaction on
 -- chain, reimbursing already committed UTxOs.
@@ -1213,7 +1208,7 @@ isLeader HeadParameters{parties} p sn =
 
 -- | Reflect 'StateChanged' events onto the 'HeadState' aggregate.
 aggregate :: HeadState tx -> StateChanged tx -> HeadState tx
-aggregate _s = \case
+aggregate st = \case
   HeadInitialized{parameters = parameters@HeadParameters{parties}, headId, chainState} ->
     Initial
       InitialState
@@ -1223,4 +1218,20 @@ aggregate _s = \case
         , chainState
         , headId
         }
+  CommittedUTxO{committedUTxO, chainState, party} -> case st of
+    Initial InitialState{parameters, pendingCommits, committed, headId} -> newState
+     where
+      newState =
+        Initial
+          InitialState
+            { parameters
+            , pendingCommits = remainingParties
+            , committed = newCommitted
+            , chainState
+            , headId
+            }
+
+      newCommitted = Map.insert party committedUTxO committed
+      remainingParties = Set.delete party pendingCommits
+    _ -> st
   StateReplaced newState -> newState
