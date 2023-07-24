@@ -366,10 +366,24 @@ deriving instance (FromJSON (TxIdType tx)) => FromJSON (RequirementFailure tx)
 instance Arbitrary (TxIdType tx) => Arbitrary (RequirementFailure tx) where
   arbitrary = genericArbitrary
 
+-- | Head state changed event. These events represent all the internal state
+-- changes, get persisted and processed in an event sourcing manner.
+data StateChanged tx
+  = StateReplaced (HeadState tx)
+  deriving stock (Generic)
+
+instance (Arbitrary (HeadState tx)) => Arbitrary (StateChanged tx) where
+  arbitrary = genericArbitrary
+
+deriving instance (Eq (HeadState tx)) => Eq (StateChanged tx)
+deriving instance (Show (HeadState tx)) => Show (StateChanged tx)
+deriving instance (ToJSON (HeadState tx)) => ToJSON (StateChanged tx)
+deriving instance (FromJSON (HeadState tx)) => FromJSON (StateChanged tx)
+
 data Outcome tx
   = NoOutcome
   | Effects {effects :: [Effect tx]}
-  | NewState {headState :: HeadState tx}
+  | StateChanged (StateChanged tx)
   | Wait {reason :: WaitReason tx}
   | Error {error :: LogicError tx}
   | Combined {left :: Outcome tx, right :: Outcome tx}
@@ -414,7 +428,7 @@ collectEffects = \case
   NoOutcome -> []
   Error _ -> []
   Wait _ -> []
-  NewState _ -> []
+  StateChanged _ -> []
   Effects effs -> effs
   Combined l r -> collectEffects l <> collectEffects r
 
@@ -423,7 +437,7 @@ collectWaits = \case
   NoOutcome -> []
   Error _ -> []
   Wait w -> [w]
-  NewState _ -> []
+  StateChanged _ -> []
   Effects _ -> []
   Combined l r -> collectWaits l <> collectWaits r
 
@@ -432,7 +446,10 @@ collectState = \case
   NoOutcome -> []
   Error _ -> []
   Wait _ -> []
-  NewState s -> [s]
+  StateChanged s ->
+    -- FIXME: This is wrong we should need the enclosing function
+    case s of
+      StateReplaced sc -> [sc]
   Effects _ -> []
   Combined l r -> collectState l <> collectState r
 
@@ -470,15 +487,16 @@ onIdleChainInitTx ::
   HeadId ->
   Outcome tx
 onIdleChainInitTx newChainState parties contestationPeriod headId =
-  NewState
-    ( Initial
-        InitialState
-          { parameters = HeadParameters{contestationPeriod, parties}
-          , pendingCommits = Set.fromList parties
-          , committed = mempty
-          , chainState = newChainState
-          , headId
-          }
+  StateChanged
+    ( StateReplaced $
+        Initial
+          InitialState
+            { parameters = HeadParameters{contestationPeriod, parties}
+            , pendingCommits = Set.fromList parties
+            , committed = mempty
+            , chainState = newChainState
+            , headId
+            }
     )
     `Combined` Effects [ClientEffect $ HeadIsInitializing headId (fromList parties)]
 
@@ -522,7 +540,8 @@ onInitialChainCommitTx ::
   UTxOType tx ->
   Outcome tx
 onInitialChainCommitTx st newChainState pt utxo =
-  NewState newState
+  StateChanged
+    (StateReplaced newState)
     `Combined` Effects
       ( notifyClient
           : [postCollectCom | canCollectCom]
@@ -578,8 +597,8 @@ onInitialChainAbortTx ::
   HeadId ->
   Outcome tx
 onInitialChainAbortTx newChainState committed headId =
-  NewState
-    (Idle IdleState{chainState = newChainState})
+  StateChanged
+    (StateReplaced $ Idle IdleState{chainState = newChainState})
     `Combined` Effects [ClientEffect $ HeadIsAborted{headId, utxo = fold committed}]
 
 -- | Observe a collectCom transaction. We initialize the 'OpenState' using the
@@ -594,22 +613,23 @@ onInitialChainCollectTx ::
   ChainStateType tx ->
   Outcome tx
 onInitialChainCollectTx st newChainState =
-  NewState
-    ( Open
-        OpenState
-          { parameters
-          , coordinatedHeadState =
-              CoordinatedHeadState
-                { localUTxO = u0
-                , allTxs = mempty
-                , localTxs = mempty
-                , confirmedSnapshot
-                , seenSnapshot = NoSeenSnapshot
-                }
-          , chainState = newChainState
-          , headId
-          , currentSlot = chainStateSlot newChainState
-          }
+  StateChanged
+    ( StateReplaced $
+        Open
+          OpenState
+            { parameters
+            , coordinatedHeadState =
+                CoordinatedHeadState
+                  { localUTxO = u0
+                  , allTxs = mempty
+                  , localTxs = mempty
+                  , confirmedSnapshot
+                  , seenSnapshot = NoSeenSnapshot
+                  }
+            , chainState = newChainState
+            , headId
+            , currentSlot = chainStateSlot newChainState
+            }
     )
     `Combined` Effects [ClientEffect $ HeadIsOpen{headId, utxo = u0}]
  where
@@ -667,31 +687,32 @@ onOpenNetworkReqTx env ledger st ttl tx = do
       -- Spec: if ŝ = s̄ ∧ leader(s̄ + 1) = i
       if not snapshotInFlight && isLeader parameters party nextSn
         then
-          NewState
-            ( Open
-                st
-                  { coordinatedHeadState =
-                      chs''
-                        { seenSnapshot =
-                            -- XXX: This state update has no equivalence in the
-                            -- spec. Do we really need to store that we have
-                            -- requested a snapshot? If yes, should update spec.
-                            RequestedSnapshot
-                              { lastSeen = seenSnapshotNumber seenSnapshot
-                              , requested = nextSn
-                              }
-                        }
-                  }
+          StateChanged
+            ( StateReplaced $
+                Open
+                  st
+                    { coordinatedHeadState =
+                        chs''
+                          { seenSnapshot =
+                              -- XXX: This state update has no equivalence in the
+                              -- spec. Do we really need to store that we have
+                              -- requested a snapshot? If yes, should update spec.
+                              RequestedSnapshot
+                                { lastSeen = seenSnapshotNumber seenSnapshot
+                                , requested = nextSn
+                                }
+                          }
+                    }
             )
             `Combined` Effects [NetworkEffect (ReqSn nextSn (txId <$> localTxs'))]
-        else NewState (Open st{coordinatedHeadState = chs''})
+        else StateChanged (StateReplaced $ Open st{coordinatedHeadState = chs''})
  where
   waitApplyTx chs cont =
     case applyTransactions currentSlot localUTxO [tx] of
       Right utxo' -> cont utxo'
       Left (_, err)
         | ttl > 0 ->
-            NewState (Open st{coordinatedHeadState = chs})
+            StateChanged (StateReplaced $ Open st{coordinatedHeadState = chs})
               `Combined` Wait (WaitOnNotApplicableTx err)
         | otherwise ->
             -- XXX: We might want to remove invalid txs from allTxs here to
@@ -773,17 +794,18 @@ onOpenNetworkReqSn env ledger st otherParty sn requestedTxIds =
             let (localTxs', localUTxO') = pruneTransactions u
             -- Spec: Tall ← {tx | ∀tx ∈ Tall : tx ∉ Treq }
             let allTxs' = foldr Map.delete allTxs requestedTxIds
-            NewState
-              ( Open
-                  st
-                    { coordinatedHeadState =
-                        coordinatedHeadState
-                          { seenSnapshot = SeenSnapshot nextSnapshot mempty
-                          , localTxs = localTxs'
-                          , localUTxO = localUTxO'
-                          , allTxs = allTxs'
-                          }
-                    }
+            StateChanged
+              ( StateReplaced $
+                  Open
+                    st
+                      { coordinatedHeadState =
+                          coordinatedHeadState
+                            { seenSnapshot = SeenSnapshot nextSnapshot mempty
+                            , localTxs = localTxs'
+                            , localUTxO = localUTxO'
+                            , allTxs = allTxs'
+                            }
+                      }
               )
  where
   requireReqSn continue
@@ -883,33 +905,35 @@ onOpenNetworkAckSn Environment{party} openState otherParty snapshotSignature sn 
             Effects [ClientEffect $ SnapshotConfirmed headId snapshot multisig]
               `Combined` if isLeader parameters party nextSn && not (null localTxs)
                 then
-                  NewState
-                    ( onlyUpdateCoordinatedHeadState $
-                        coordinatedHeadState
-                          { confirmedSnapshot =
-                              ConfirmedSnapshot
-                                { snapshot
-                                , signatures = multisig
-                                }
-                          , seenSnapshot =
-                              RequestedSnapshot
-                                { lastSeen = sn
-                                , requested = nextSn
-                                }
-                          }
+                  StateChanged
+                    ( StateReplaced $
+                        onlyUpdateCoordinatedHeadState $
+                          coordinatedHeadState
+                            { confirmedSnapshot =
+                                ConfirmedSnapshot
+                                  { snapshot
+                                  , signatures = multisig
+                                  }
+                            , seenSnapshot =
+                                RequestedSnapshot
+                                  { lastSeen = sn
+                                  , requested = nextSn
+                                  }
+                            }
                     )
                     `Combined` Effects [NetworkEffect (ReqSn nextSn (txId <$> localTxs))]
                 else
-                  NewState
-                    ( onlyUpdateCoordinatedHeadState $
-                        coordinatedHeadState
-                          { confirmedSnapshot =
-                              ConfirmedSnapshot
-                                { snapshot
-                                , signatures = multisig
-                                }
-                          , seenSnapshot = LastSeenSnapshot sn
-                          }
+                  StateChanged
+                    ( StateReplaced $
+                        onlyUpdateCoordinatedHeadState $
+                          coordinatedHeadState
+                            { confirmedSnapshot =
+                                ConfirmedSnapshot
+                                  { snapshot
+                                  , signatures = multisig
+                                  }
+                            , seenSnapshot = LastSeenSnapshot sn
+                            }
                     )
  where
   seenSn = seenSnapshotNumber seenSnapshot
@@ -934,11 +958,12 @@ onOpenNetworkAckSn Environment{party} openState otherParty snapshotSignature sn 
     if Map.keysSet sigs' == Set.fromList parties
       then cont
       else
-        NewState
-          ( onlyUpdateCoordinatedHeadState $
-              coordinatedHeadState
-                { seenSnapshot = SeenSnapshot snapshot sigs'
-                }
+        StateChanged
+          ( StateReplaced $
+              onlyUpdateCoordinatedHeadState $
+                coordinatedHeadState
+                  { seenSnapshot = SeenSnapshot snapshot sigs'
+                  }
           )
 
   requireVerifiedMultisignature multisig msg cont =
@@ -1000,7 +1025,7 @@ onOpenChainCloseTx ::
   UTCTime ->
   Outcome tx
 onOpenChainCloseTx openState newChainState closedSnapshotNumber contestationDeadline =
-  NewState closedState
+  StateChanged (StateReplaced closedState)
     `Combined` Effects
       ( notifyClient
           : [ OnChainEffect
@@ -1088,8 +1113,8 @@ onClosedChainFanoutTx ::
   ChainStateType tx ->
   Outcome tx
 onClosedChainFanoutTx closedState newChainState =
-  NewState
-    (Idle IdleState{chainState = newChainState})
+  StateChanged
+    (StateReplaced $ Idle IdleState{chainState = newChainState})
     `Combined` Effects [ClientEffect $ HeadIsFinalized{headId, utxo}]
  where
   Snapshot{utxo} = getSnapshot confirmedSnapshot
@@ -1153,8 +1178,8 @@ update env ledger st ev = case (st, ev) of
     onClosedChainContestTx closedState snapshotNumber
   (Closed cst@ClosedState{contestationDeadline, readyToFanoutSent, headId}, OnChainEvent Tick{chainTime})
     | chainTime > contestationDeadline && not readyToFanoutSent ->
-        NewState
-          (Closed cst{readyToFanoutSent = True})
+        StateChanged
+          (StateReplaced $ Closed cst{readyToFanoutSent = True})
           `Combined` Effects [ClientEffect $ ReadyToFanout headId]
   (Closed closedState, ClientEvent Fanout) ->
     onClosedClientFanout closedState
@@ -1162,9 +1187,9 @@ update env ledger st ev = case (st, ev) of
     onClosedChainFanoutTx closedState newChainState
   -- General
   (currentState, OnChainEvent Rollback{rolledBackChainState}) ->
-    NewState (setChainState rolledBackChainState currentState)
+    StateChanged (StateReplaced $ setChainState rolledBackChainState currentState)
   (Open ost@OpenState{}, OnChainEvent Tick{chainSlot}) ->
-    NewState (Open ost{currentSlot = chainSlot})
+    StateChanged (StateReplaced $ Open ost{currentSlot = chainSlot})
   (_, OnChainEvent Tick{}) ->
     NoOutcome
   (_, PostTxError{postChainTx, postTxError}) ->
@@ -1181,3 +1206,10 @@ isLeader HeadParameters{parties} p sn =
   case p `elemIndex` parties of
     Just i -> ((fromIntegral sn - 1) `mod` length parties) == i
     _ -> False
+
+-- * HeadState aggregate
+
+-- | Reflect 'StateChanged' events onto the 'HeadState' aggregate.
+aggregate :: HeadState tx -> StateChanged tx -> HeadState tx
+aggregate _s = \case
+  StateReplaced newState -> newState

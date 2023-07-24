@@ -48,7 +48,7 @@ import Hydra.HeadLogic (
   collectState,
   collectWaits,
   defaultTTL,
-  update,
+  update, StateChanged (StateReplaced),
  )
 import Hydra.Ledger (ChainSlot (..), IsTx (txId), Ledger (..), ValidationError (..))
 import Hydra.Ledger.Cardano (cardanoLedger, genKeyPair, genOutput, mkRangedTx)
@@ -407,7 +407,7 @@ spec =
             s1 = update bobEnv ledger s0 closeTxEvent
         s1 `hasEffect` contestTxEffect
         s1 `shouldSatisfy` \case
-          Combined (NewState (Closed ClosedState{})) _ -> True
+          Combined (StateChanged (StateReplaced (Closed ClosedState{}))) _ -> True
           _ -> False
 
       it "re-contests when detecting contest with old snapshot" $ do
