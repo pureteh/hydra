@@ -1,0 +1,43 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Hydra.Cardano.Api.TxId</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Hydra.Cardano.Api.Prelude.html"><span class="hs-identifier">Hydra.Cardano.Api.Prelude</span></a></span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.Crypto.Hash.Class</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">CC</span></span><span>
+</span><span id="line-6"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.Ledger.SafeHash</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Ledger</span></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.Ledger.TxIn</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Ledger</span></span><span>
+</span><span id="line-8"></span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- * Type Conversions</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- | Convert a cardano-api 'TxId' into a cardano-ledger 'TxId'.</span><span>
+</span><span id="line-12"></span><span class="annot"><a href="Hydra.Cardano.Api.TxId.html#toLedgerTxId"><span class="hs-identifier hs-type">toLedgerTxId</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TxId</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ledger.TxId</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">StandardCrypto</span></span><span>
+</span><span id="line-13"></span><span id="toLedgerTxId"><span class="annot"><span class="annottext">toLedgerTxId :: TxId -&gt; TxId StandardCrypto
+</span><a href="Hydra.Cardano.Api.TxId.html#toLedgerTxId"><span class="hs-identifier hs-var hs-var">toLedgerTxId</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">TxId</span></span><span> </span><span id="local-6989586621679229559"><span class="annot"><span class="annottext">Hash StandardCrypto EraIndependentTxBody
+</span><a href="#local-6989586621679229559"><span class="hs-identifier hs-var">h</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-14"></span><span>  </span><span class="annot"><span class="annottext">SafeHash StandardCrypto EraIndependentTxBody -&gt; TxId StandardCrypto
+forall crypto. SafeHash crypto EraIndependentTxBody -&gt; TxId crypto
+</span><span class="hs-identifier hs-var">Ledger.TxId</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hash StandardCrypto EraIndependentTxBody
+-&gt; SafeHash StandardCrypto EraIndependentTxBody
+forall crypto index.
+Hash (HASH crypto) index -&gt; SafeHash crypto index
+</span><span class="hs-identifier hs-var">Ledger.unsafeMakeSafeHash</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hash Blake2b_256 EraIndependentTxBody
+-&gt; Hash Blake2b_256 EraIndependentTxBody
+forall h a b. Hash h a -&gt; Hash h b
+</span><span class="hs-identifier hs-var">CC.castHash</span></span><span> </span><span class="annot"><span class="annottext">Hash StandardCrypto EraIndependentTxBody
+Hash Blake2b_256 EraIndependentTxBody
+</span><a href="#local-6989586621679229559"><span class="hs-identifier hs-var">h</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- | Convert a cardano-ledger 'TxId' into a cardano-api 'TxId'.</span><span>
+</span><span id="line-17"></span><span class="annot"><a href="Hydra.Cardano.Api.TxId.html#fromLedgerTxId"><span class="hs-identifier hs-type">fromLedgerTxId</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Ledger.TxId</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">StandardCrypto</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TxId</span></span><span>
+</span><span id="line-18"></span><span id="fromLedgerTxId"><span class="annot"><span class="annottext">fromLedgerTxId :: TxId StandardCrypto -&gt; TxId
+</span><a href="Hydra.Cardano.Api.TxId.html#fromLedgerTxId"><span class="hs-identifier hs-var hs-var">fromLedgerTxId</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Ledger.TxId</span></span><span> </span><span id="local-6989586621679229554"><span class="annot"><span class="annottext">SafeHash StandardCrypto EraIndependentTxBody
+</span><a href="#local-6989586621679229554"><span class="hs-identifier hs-var">h</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-19"></span><span>  </span><span class="annot"><span class="annottext">Hash StandardCrypto EraIndependentTxBody -&gt; TxId
+</span><span class="hs-identifier hs-var">TxId</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Hash Blake2b_256 EraIndependentTxBody
+-&gt; Hash Blake2b_256 EraIndependentTxBody
+forall h a b. Hash h a -&gt; Hash h b
+</span><span class="hs-identifier hs-var">CC.castHash</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SafeHash StandardCrypto EraIndependentTxBody
+-&gt; Hash StandardCrypto EraIndependentTxBody
+forall crypto i. SafeHash crypto i -&gt; Hash (HASH crypto) i
+</span><span class="hs-identifier hs-var">Ledger.extractHash</span></span><span> </span><span class="annot"><span class="annottext">SafeHash StandardCrypto EraIndependentTxBody
+</span><a href="#local-6989586621679229554"><span class="hs-identifier hs-var">h</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span></pre></body></html>
